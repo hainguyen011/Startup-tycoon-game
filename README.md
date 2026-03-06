@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Startup Tycoon AI - Vercel Deployment
 
-# Run and deploy your AI Studio app
+This project is a React application built with Vite, optimized for deployment on [Vercel](https://vercel.com).
 
-This contains everything you need to run your app locally.
+## Deployment Steps
 
-View your app in AI Studio: https://ai.studio/apps/84a5e7bf-976e-423e-9b94-8e095d75ac9c
+1.  **Push to GitHub/GitLab/Bitbucket**: Ensure your code is in a repository.
+2.  **Import to Vercel**: Connect your repository to Vercel.
+3.  **Framework Preset**: Vercel will automatically detect **Vite**.
+4.  **Environment Variables**:
+    -   The application is designed for users to provide their own API keys in the UI.
+    -   No server-side environment variables are required for the basic simulation.
+5.  **Build and Deploy**: Click "Deploy".
 
-## Run Locally
+## Project Structure
 
-**Prerequisites:**  Node.js
+-   `src/`: React source code.
+-   `index.html`: Entry point.
+-   `vercel.json`: Configuration for SPA routing.
+-   `vite.config.ts`: Vite configuration.
 
+## Features
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+-   **AI-Powered Simulation**: Uses Google Gemini (via user-provided API keys).
+-   **Multi-language Support**: English and Vietnamese.
+-   **Responsive Design**: Mobile-friendly interface.
