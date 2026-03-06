@@ -1,3 +1,4 @@
+
 export enum Industry {
   TECH = 'Technology (SaaS)',
   HEALTH = 'Health & BioTech',
@@ -5,6 +6,10 @@ export enum Industry {
   EDTECH = 'Education Tech',
   FMCG = 'Consumer Goods (FMCG)'
 }
+
+export type Language = 'vi' | 'en';
+
+export type LLMProvider = 'gemini' | 'openai' | 'deepseek';
 
 export enum GameStage {
   SETUP = 'SETUP',
@@ -25,6 +30,8 @@ export interface IntelItem {
   title: string;
   content: string;
   cost: number;
+  source?: string;
+  reliability?: number; // 0-100
 }
 
 // --- NEW TYPES FOR ADVANCED MANAGEMENT ---
@@ -46,7 +53,8 @@ export interface Employee {
   stress: number; 
   loyalty: number; 
   traits: string[]; 
-  assignedProductId?: string | null; // New: Link to a product
+  assignedProductId?: string | null; // Link to a product
+  assignedContractId?: string | null; // Link to a contract
 }
 
 export interface Candidate {
@@ -93,6 +101,40 @@ export interface Product {
   
   // Feedback
   activeFeedback: string[]; // List of user complaints/praises
+}
+
+// --- CONTRACTS SYSTEM ---
+export interface Contract {
+  id: string;
+  name: string;
+  description: string;
+  difficulty: number; // Required total skill points per turn to progress well
+  totalEffortRequired: number; // Total points to complete
+  currentEffort: number;
+  deadlineWeeks: number; // Turns remaining
+  reward: number;
+  penalty: number; // Reputation loss or money
+  reqSkills: string[]; // e.g., ["React", "Python"]
+  status: 'available' | 'active' | 'completed' | 'failed';
+  minEmployees: number;
+}
+
+// --- INVESTOR SYSTEM ---
+export interface Investor {
+  id: string;
+  name: string;
+  style: 'Aggressive' | 'Conservative' | 'Visionary' | 'Shark';
+  description: string;
+  status: 'new' | 'negotiating' | 'partner' | 'rejected';
+  
+  // For Negotiation
+  offerAmount: number;
+  equityDemanded: number; // %
+  valuation: number;
+  
+  // Negotiation State
+  patience: number; // 0-3 turns
+  lastResponse?: string;
 }
 
 export interface Facility {
@@ -164,6 +206,13 @@ export interface SimulationResult {
       revenueChange: number;
       newFeedback?: string;
   }[];
+
+  // Contract Updates
+  contractResults?: {
+      contractId: string;
+      status: 'progress' | 'completed' | 'failed';
+      message: string;
+  }[];
 }
 
 export interface GameState {
@@ -176,10 +225,13 @@ export interface GameState {
   marketShare: number; 
   equity: number;
   turn: number;
+  reputation: number; // New: 0-100 score for contracts
   
   employees: Employee[];
   candidates: Candidate[]; 
   products: Product[]; // List of products
+  contracts: Contract[]; // New: Contracts list
+  investors: Investor[]; // New: Investors list
   facilities: Facility[];
   playerSkills: PlayerSkills;
   
@@ -192,13 +244,22 @@ export interface GameState {
 
 export const INITIAL_CASH = 10000;
 
+// Defined explicitly to be shared between UI and Logic if needed
+export const MARKETING_COSTS: Record<string, number> = {
+    'Chạy quảng cáo Facebook/Google': 1500,
+    'Content Marketing (SEO)': 500,
+    'Thuê Influencer/KOL': 3000,
+    'Tổ chức Event/Webinar': 2000,
+    'Cold Emailing/Sales': 200
+};
+
 export const INITIAL_FACILITIES: Facility[] = [
   {
     id: 'office',
     name: 'Home Office / Garage',
     level: 1,
     maxLevel: 5,
-    description: 'Không gian làm việc chật hẹp, chi phí thấp.',
+    description: 'Workspace', // Generic description, will be translated in UI
     costToUpgrade: 5000,
     maintenanceCost: 100, 
     benefit: 'Max 3 Employees',
@@ -210,7 +271,7 @@ export const INITIAL_FACILITIES: Facility[] = [
     name: 'Shared Hosting',
     level: 1,
     maxLevel: 5,
-    description: 'Server giá rẻ, dễ sập khi đông khách.',
+    description: 'Basic Server',
     costToUpgrade: 2000,
     maintenanceCost: 50,
     benefit: 'Max 1,000 Users',

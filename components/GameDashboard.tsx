@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, GameStage, PlayerDecisions, Industry, SimulationResult, IntelType, IntelItem, Employee, Facility, Candidate, InteractiveEvent, Product, ProductStage } from '../types';
+import { GameState, GameStage, PlayerDecisions, Industry, SimulationResult, IntelType, IntelItem, Employee, Facility, Candidate, InteractiveEvent, Product, ProductStage, MARKETING_COSTS, Contract } from '../types';
 import StatCard from './StatCard';
 import Button from './Button';
-import { DollarSign, Users, TrendingUp, Zap, Activity, PieChart, Send, AlertTriangle, ShieldAlert, Lock, Search, Eye, FileText, BrainCircuit, Landmark, Briefcase, Server, User, UserPlus, XCircle, ChevronUp, Sparkles, Smile, Frown, CheckCircle, Tag, Trophy, Target, ClipboardList, Bell, AlertOctagon, HelpCircle, GraduationCap, History, FileSearch, Quote, Coffee, MessageSquare, Heart, BatteryWarning, MessageCircle, Loader2, Package, Plus, Bug, Gem, Megaphone, TrendingDown, Wallet, CreditCard, BarChart3 } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, AreaChart, Area, BarChart, Bar, Cell } from 'recharts';
+import { DollarSign, Users, TrendingUp, Zap, Activity, PieChart, Send, AlertTriangle, ShieldAlert, Lock, Search, Eye, FileText, BrainCircuit, Landmark, Briefcase, Server, User, UserPlus, XCircle, ChevronUp, Sparkles, Smile, Frown, CheckCircle, Tag, Trophy, Target, ClipboardList, Bell, AlertOctagon, HelpCircle, GraduationCap, History, FileSearch, Quote, Coffee, MessageSquare, Heart, BatteryWarning, MessageCircle, Loader2, Package, Plus, Bug, Gem, Megaphone, TrendingDown, Wallet, CreditCard, BarChart3, Menu, X, FileLock, Radio, Signal, ArrowRight, Laptop, HandCoins, ScrollText, Handshake, LayoutDashboard, Building2, Briefcase as BriefcaseIcon, Settings2, Rocket } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
+import { useLanguage } from '../LanguageContext';
 
 interface GameDashboardProps {
   state: GameState;
   currentIntel: IntelItem[];
   onTurnSubmit: (decisions: PlayerDecisions) => void;
   onBuyIntel: (type: IntelType, cost: number) => void;
-  onRecruit: (jobDesc: string) => void; 
+  onDismissIntel: (id: string) => void; 
+  onRecruit: (jobDesc: string, budget: number) => void; 
   onHireCandidate: (candidate: Candidate) => void;
   onFire: (id: string) => void;
   onUpgradeFacility: (facilityId: string) => void;
@@ -18,106 +20,90 @@ interface GameDashboardProps {
   onRestart: () => void;
   onEventDecision: (decision: string) => void;
   onChatWithEmployee?: (empId: string, message: string) => Promise<string>;
-  onAssignEmployee: (empId: string, productId: string | null) => void;
+  onAssignEmployee: (empId: string, targetId: string | null) => void;
   onCreateProduct: (name: string, desc: string) => void;
   onPitch: (round: string) => Promise<{success: boolean, message: string}>;
+  onFindContracts: () => void;
+  onAcceptContract: (id: string) => void;
+  onFindInvestor: () => void;
+  onNegotiate: (investorId: string, message: string) => void;
+  onAskAdvice: () => void;
 }
 
-// Estimated costs for UI display (AI handles actual logic, but this helps player plan)
-const MARKETING_COSTS: Record<string, number> = {
-    'Chạy quảng cáo Facebook/Google': 1500,
-    'Content Marketing (SEO)': 500,
-    'Thuê Influencer/KOL': 3000,
-    'Tổ chức Event/Webinar': 2000,
-    'Cold Emailing/Sales': 200
-};
-
-const GameDashboard: React.FC<GameDashboardProps> = ({ 
-    state, currentIntel, onTurnSubmit, onBuyIntel, onRecruit, onHireCandidate, onFire, onUpgradeFacility, isProcessing, onRestart, onEventDecision, onChatWithEmployee, onAssignEmployee, onCreateProduct, onPitch
+export const GameDashboard: React.FC<GameDashboardProps> = ({ 
+    state, currentIntel, onTurnSubmit, onBuyIntel, onDismissIntel, onRecruit, onHireCandidate, onFire, onUpgradeFacility, isProcessing, onRestart, onEventDecision, onChatWithEmployee, onAssignEmployee, onCreateProduct, onPitch, onFindContracts, onAcceptContract, onFindInvestor, onNegotiate, onAskAdvice
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'hr' | 'products' | 'facilities' | 'profile' | 'secretary'>('overview');
-  const [hrSubTab, setHrSubTab] = useState<'manage' | 'recruit'>('manage');
+  const { t } = useLanguage();
+  
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'contracts' | 'investment' | 'team' | 'infra' | 'report'>('overview');
+  
+  // Mobile UI State
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
 
-  // Turn Decision State
+  // Sub-states
+  const [hrSubTab, setHrSubTab] = useState<'manage' | 'recruit'>('manage');
   const [rdFocus, setRdFocus] = useState('Nâng cấp tính năng cốt lõi');
   const [marketingFocus, setMarketingFocus] = useState('Chạy quảng cáo Facebook/Google');
   const [fundingRound, setFundingRound] = useState('Seed Round ($200k)');
   const [strategyNote, setStrategyNote] = useState('');
   
-  // Event State
+  // Modals & Popups State
   const [activeEvent, setActiveEvent] = useState<InteractiveEvent | null>(null);
-  
-  // Recruitment State
   const [jobDescription, setJobDescription] = useState('');
+  const [recruitBudget, setRecruitBudget] = useState(1500);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-
-  // Chat State
   const [chatEmployeeId, setChatEmployeeId] = useState<string | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<{sender: 'user' | 'bot', text: string}[]>([]);
   const [isChatting, setIsChatting] = useState(false);
-
-  // Product Creation State
+  const [activeNegotiationId, setActiveNegotiationId] = useState<string | null>(null);
+  const [negotiationMessage, setNegotiationMessage] = useState('');
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProdName, setNewProdName] = useState('');
   const [newProdDesc, setNewProdDesc] = useState('');
-
-  // Pitch State
   const [pitchResult, setPitchResult] = useState<{success: boolean, message: string} | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Check for Secretary
   const secretary = state.employees.find(e => e.role === 'Secretary');
   const hasSecretary = !!secretary;
 
-  // --- CALCULATE METRICS ---
+  // --- Derived Metrics ---
   const totalRevenue = state.products.reduce((acc, p) => acc + p.revenue, 0);
   const totalSalaries = state.employees.reduce((acc, e) => acc + e.salary, 0);
   const facilityCosts = state.facilities.reduce((acc, f) => acc + f.maintenanceCost, 0);
   const marketingCost = MARKETING_COSTS[marketingFocus] || 0;
-  
-  const totalExpenses = totalSalaries + facilityCosts + marketingCost;
-  const netIncome = totalRevenue - totalExpenses;
+  const totalWeeklyExpenses = Math.round((totalSalaries + facilityCosts) / 4) + marketingCost;
+  const netIncome = totalRevenue - totalWeeklyExpenses;
   const burnRate = netIncome < 0 ? Math.abs(netIncome) : 0;
   const runway = burnRate > 0 ? Math.floor(state.cash / burnRate) : 999;
-  
   const avgStress = state.employees.length > 0 ? Math.round(state.employees.reduce((acc, e) => acc + e.stress, 0) / state.employees.length) : 0;
   const avgSkill = state.employees.length > 0 ? Math.round(state.employees.reduce((acc, e) => acc + e.skill, 0) / state.employees.length) : 0;
+  const latestResult = state.history.length > 0 ? state.history[state.history.length - 1] : undefined;
 
+  const chartData = state.history.reduce((acc, h, i) => {
+      const prevUsers = acc.length > 0 ? acc[acc.length - 1].users : 0;
+      acc.push({ name: `W${i + 1}`, users: Math.max(0, prevUsers + h.userChange) });
+      return acc;
+  }, [] as { name: string, users: number }[]);
+  
+  // --- Effects ---
   useEffect(() => {
     if (state.history.length > 0) {
         const lastResult = state.history[state.history.length - 1];
-        if (lastResult.randomEvent) {
-            setActiveEvent(lastResult.randomEvent);
-        }
+        if (lastResult.randomEvent) setActiveEvent(lastResult.randomEvent);
     }
   }, [state.history]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [state.history]);
+    if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [chatHistory, chatEmployeeId]);
 
-  // Handle choice made in modal
-  const handleEventChoice = (choiceLabel: string) => {
-      onEventDecision(choiceLabel);
-      setActiveEvent(null); // Dismiss modal
-  };
-
-  const handleHireFromModal = () => {
-      if (selectedCandidate) {
-          onHireCandidate(selectedCandidate);
-          setSelectedCandidate(null);
-      }
-  };
-  
-  const openChat = (emp: Employee) => {
-      setChatEmployeeId(emp.id);
-      setChatHistory([{sender: 'bot', text: `Chào sếp, tôi là ${emp.name}. Có chuyện gì không ạ?`}]);
-  };
-
+  // --- Actions ---
+  const handleEventChoice = (choiceLabel: string) => { onEventDecision(choiceLabel); setActiveEvent(null); };
+  const openChat = (emp: Employee) => { setChatEmployeeId(emp.id); setChatHistory([{sender: 'bot', text: `Chào sếp, tôi là ${emp.name}.`}]); };
   const sendChat = async () => {
       if (!chatMessage.trim() || !chatEmployeeId || !onChatWithEmployee) return;
       const msg = chatMessage;
@@ -128,410 +114,166 @@ const GameDashboard: React.FC<GameDashboardProps> = ({
       setChatHistory(prev => [...prev, {sender: 'bot', text: response}]);
       setIsChatting(false);
   };
+  const handleNegotiationSubmit = () => { if (activeNegotiationId && negotiationMessage) { onNegotiate(activeNegotiationId, negotiationMessage); setNegotiationMessage(''); } };
+  const handleCreateProductSubmit = () => { if(newProdName && newProdDesc) { onCreateProduct(newProdName, newProdDesc); setIsCreatingProduct(false); setNewProdName(''); setNewProdDesc(''); } };
+  const handlePitchClick = async () => { if(isProcessing) return; const res = await onPitch(fundingRound); setPitchResult(res); setTimeout(() => setPitchResult(null), 8000); };
+  const handleHireFromModal = () => { if (selectedCandidate) { onHireCandidate(selectedCandidate); setSelectedCandidate(null); } };
 
-  const handleCreateProductSubmit = () => {
-      if(newProdName && newProdDesc) {
-          onCreateProduct(newProdName, newProdDesc);
-          setIsCreatingProduct(false);
-          setNewProdName('');
-          setNewProdDesc('');
-      }
-  }
-
-  const handlePitchClick = async () => {
-      if(isProcessing) return;
-      const res = await onPitch(fundingRound);
-      setPitchResult(res);
-      setTimeout(() => setPitchResult(null), 8000);
-  }
-
-  // Handle Game Over / Victory Screen
+  // --- Render Helpers ---
+  const activeChatEmployee = state.employees.find(e => e.id === chatEmployeeId);
+  const activeNegotiation = state.investors.find(i => i.id === activeNegotiationId);
+  
+  // Game Over Screen
   if (state.stage === GameStage.GAME_OVER || state.stage === GameStage.VICTORY) {
      return (
-        <div className="max-w-2xl mx-auto text-center p-12 bg-white/90 border border-white shadow-2xl rounded-3xl mt-10 relative overflow-hidden animate-fadeIn backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-50/50 z-0"></div>
-          <div className="relative z-10">
-            <div className="mb-8 inline-flex items-center justify-center p-8 bg-slate-50 rounded-full shadow-inner border border-slate-100">
-                {state.stage === GameStage.VICTORY ? <Trophy size={80} className="text-yellow-500 drop-shadow-md" /> : <AlertTriangle size={80} className="text-red-500 drop-shadow-md" />}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100 bg-grid-pattern p-4">
+          <div className="bg-white/90 backdrop-blur-xl border border-white shadow-2xl rounded-3xl p-8 max-w-lg w-full text-center animate-fadeIn">
+            <div className="mb-6 inline-flex p-6 bg-slate-50 rounded-full shadow-inner">
+                {state.stage === GameStage.VICTORY ? <Trophy size={60} className="text-yellow-500" /> : <AlertTriangle size={60} className="text-rose-500" />}
             </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 font-heading tracking-tight">
-                {state.stage === GameStage.VICTORY ? "Kỳ Lân Công Nghệ!" : "Game Over"}
-            </h2>
-            <p className="text-slate-600 mb-10 text-xl leading-relaxed">
-                {state.stage === GameStage.VICTORY 
-                ? `Chúc mừng! ${state.companyName} đã trở thành công ty tỷ đô và IPO thành công.` 
-                : `${state.gameOverReason || "Startup của bạn đã dừng bước."}`}
-            </p>
-            
-            <div className="grid grid-cols-2 gap-4 mb-10 max-w-lg mx-auto">
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-bold">Final Users</div>
-                    <div className="text-3xl font-bold text-slate-900">{state.users.toLocaleString()}</div>
-                </div>
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-bold">Equity Kept</div>
-                    <div className="text-3xl font-bold text-yellow-600">{state.equity}%</div>
-                </div>
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-4 font-heading">{state.stage === GameStage.VICTORY ? t('gameover.victory') : t('gameover.title')}</h2>
+            <p className="text-slate-600 mb-8 text-lg">{state.stage === GameStage.VICTORY ? `Congrats! ${state.companyName} is now a Unicorn!` : `${state.gameOverReason || t('gameover.reason')}`}</p>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200"><div className="text-xs text-slate-500 uppercase font-bold">Final Users</div><div className="text-2xl font-bold text-slate-900">{state.users.toLocaleString()}</div></div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200"><div className="text-xs text-slate-500 uppercase font-bold">Equity Kept</div><div className="text-2xl font-bold text-yellow-600">{state.equity}%</div></div>
             </div>
-            
-            <Button onClick={onRestart} className="w-full py-4 text-lg shadow-lg hover:shadow-xl" variant={state.stage === GameStage.VICTORY ? 'success' : 'primary'}>
-                Chơi lại từ đầu
-            </Button>
+            <Button onClick={onRestart} className="w-full py-4 text-lg shadow-xl" variant={state.stage === GameStage.VICTORY ? 'success' : 'primary'}>{t('gameover.restart')}</Button>
           </div>
         </div>
       );
   }
 
-  const latestResult = state.history.length > 0 ? state.history[state.history.length - 1] : null;
-  
-  // Chart Data
-  let runningUsers = 0;
-  const growthChartData = state.history.map((h, i) => {
-      runningUsers += h.userChange;
-      return { name: `T${i+1}`, users: runningUsers > 0 ? runningUsers : 0 };
-  });
+  // --- Layout Components ---
 
-  const INTEL_OPTIONS = [
-    { type: IntelType.MARKET, title: "Market Research", cost: 500, icon: <TrendingUp size={16}/>, desc: "Dự báo xu hướng" },
-    { type: IntelType.COMPETITOR, title: "Spy Competitor", cost: 1200, icon: <Eye size={16}/>, desc: "Soi đối thủ" },
-    { type: IntelType.INTERNAL, title: "Internal Audit", cost: 300, icon: <FileText size={16}/>, desc: "Đánh giá team" },
-  ];
+  const SidebarItem = ({ id, label, icon }: { id: typeof activeTab, label: string, icon: React.ReactNode }) => (
+      <button 
+          onClick={() => setActiveTab(id)}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative font-medium
+          ${activeTab === id ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+      >
+          {React.cloneElement(icon as React.ReactElement<any>, { size: 20, className: activeTab === id ? 'text-white' : 'text-slate-400 group-hover:text-blue-500' })}
+          <span className="text-sm tracking-wide">{label}</span>
+          {id === 'contracts' && state.contracts.filter(c => c.status === 'active').length > 0 && (
+             <span className="absolute right-3 w-2 h-2 rounded-full bg-orange-500 ring-2 ring-white"></span>
+          )}
+      </button>
+  );
 
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: <Activity size={16}/> },
-    { id: 'products', label: `Products (${state.products.length})`, icon: <Package size={16}/> },
-    { id: 'report', label: 'Report', icon: <ClipboardList size={16}/> },
-    { id: 'secretary', label: 'Secretary', icon: <Coffee size={16}/>, hidden: !hasSecretary },
-    { id: 'hr', label: `Team (${state.employees.length})`, icon: <Users size={16}/> },
-    { id: 'facilities', label: 'Infra', icon: <Server size={16}/> },
-    { id: 'profile', label: 'Founder', icon: <User size={16}/> },
-  ].filter(t => !t.hidden) as { id: typeof activeTab, label: string, icon: React.ReactNode }[];
-
-  const activeChatEmployee = state.employees.find(e => e.id === chatEmployeeId);
+  const MobileNavItem = ({ id, label, icon }: { id: typeof activeTab, label: string, icon: React.ReactNode }) => (
+      <button 
+          onClick={() => setActiveTab(id)}
+          className={`flex-1 flex flex-col items-center justify-center py-2 transition-all duration-200
+          ${activeTab === id ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+      >
+          {React.cloneElement(icon as React.ReactElement<any>, { size: 22, className: activeTab === id ? 'text-blue-600' : 'text-slate-400' })}
+          <span className="text-[10px] font-bold mt-1">{label}</span>
+      </button>
+  );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full animate-fadeIn items-start relative">
-      
-      {/* CHAT MODAL */}
-      {chatEmployeeId && activeChatEmployee && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden relative flex flex-col h-[600px]">
-                  {/* Header */}
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
-                      <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
-                              {activeChatEmployee.name.charAt(0)}
-                          </div>
-                          <div>
-                              <div className="font-bold text-slate-900">{activeChatEmployee.name}</div>
-                              <div className="text-xs text-slate-500">{activeChatEmployee.role}</div>
-                          </div>
-                      </div>
-                      <button onClick={() => setChatEmployeeId(null)} className="p-2 hover:bg-slate-200 rounded-full">
-                          <XCircle size={20} className="text-slate-400" />
-                      </button>
-                  </div>
-
-                  {/* Stats Bar */}
-                  <div className="px-4 py-2 bg-slate-50/50 border-b border-slate-100 flex gap-4 justify-around text-xs">
-                      <div className="flex items-center gap-1 text-red-600 font-bold">
-                          <BatteryWarning size={12}/> Stress: {Math.round(activeChatEmployee.stress)}%
-                      </div>
-                      <div className="flex items-center gap-1 text-blue-600 font-bold">
-                          <Zap size={12}/> Morale: {Math.round(activeChatEmployee.morale)}%
-                      </div>
-                  </div>
-
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
-                      {chatHistory.map((msg, i) => (
-                          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'}`}>
-                                  {msg.text}
-                              </div>
-                          </div>
-                      ))}
-                      {isChatting && (
-                           <div className="flex justify-start">
-                               <div className="bg-slate-100 px-4 py-2 rounded-2xl text-xs text-slate-500 italic flex items-center gap-1">
-                                   <Loader2 size={12} className="animate-spin"/> Typing...
-                               </div>
-                           </div>
-                      )}
-                  </div>
-
-                  {/* Input */}
-                  <div className="p-3 border-t border-slate-200 bg-white">
-                      <div className="flex gap-2">
-                          <input 
-                              className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                              placeholder="Type a message..."
-                              value={chatMessage}
-                              onChange={e => setChatMessage(e.target.value)}
-                              onKeyDown={e => e.key === 'Enter' && sendChat()}
-                              disabled={isChatting}
-                          />
-                          <button 
-                             onClick={sendChat}
-                             disabled={!chatMessage.trim() || isChatting}
-                             className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
-                          >
-                              <Send size={18} />
-                          </button>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* CANDIDATE CV MODAL */}
-      {selectedCandidate && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden relative max-h-[90vh] flex flex-col">
-                  {/* Header */}
-                  <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-start shrink-0">
-                      <div className="flex gap-4 items-center">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
-                                {selectedCandidate.name.charAt(0)}
-                          </div>
-                          <div>
-                              <h2 className="text-2xl font-bold font-heading text-slate-900">{selectedCandidate.name}</h2>
-                              <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase tracking-wide">
-                                      {selectedCandidate.level} {selectedCandidate.role}
-                                  </span>
-                                  <span className="text-slate-500 text-sm flex items-center gap-1">
-                                      <History size={14}/> {selectedCandidate.experienceYears}y Exp
-                                  </span>
-                              </div>
-                          </div>
-                      </div>
-                      <button onClick={() => setSelectedCandidate(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                          <XCircle size={24} className="text-slate-400" />
-                      </button>
-                  </div>
-
-                  {/* Scrollable Content */}
-                  <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
-                      
-                      {/* Bio Section */}
-                      <div className="prose prose-slate max-w-none">
-                          <p className="text-slate-700 italic text-lg leading-relaxed border-l-4 border-blue-300 pl-4">
-                              "{selectedCandidate.bio}"
-                          </p>
-                      </div>
-
-                      {/* Details Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                      <GraduationCap size={14}/> Education
-                                  </h4>
-                                  <p className="text-sm font-medium text-slate-800">{selectedCandidate.education}</p>
-                              </div>
-                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                      <BrainCircuit size={14}/> Skills
-                                  </h4>
-                                  <div className="flex flex-wrap gap-2">
-                                      {selectedCandidate.specificSkills.map((s, i) => (
-                                          <span key={i} className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded-md">{s}</span>
-                                      ))}
-                                  </div>
-                              </div>
-                          </div>
-
-                          <div className="space-y-4">
-                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                      <Target size={14}/> Assessment
-                                  </h4>
-                                  <div className="flex justify-between items-center mb-2">
-                                      <span className="text-sm text-slate-600">Technical Rating</span>
-                                      <span className="font-bold text-slate-900">{selectedCandidate.skill}/100</span>
-                                  </div>
-                                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                                      <div className="bg-blue-500 h-full" style={{width: `${selectedCandidate.skill}%`}}></div>
-                                  </div>
-                                  <p className="text-xs text-slate-500 mt-2">{selectedCandidate.matchAnalysis}</p>
-                              </div>
-
-                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                      <Sparkles size={14}/> Personality Quirk
-                                  </h4>
-                                  <p className="text-sm text-yellow-700 font-medium">{selectedCandidate.quirk}</p>
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* Interview Notes */}
-                      <div className="bg-yellow-50 p-5 rounded-xl border border-yellow-100 relative">
-                          <Quote className="absolute top-4 right-4 text-yellow-200" size={40} />
-                          <h4 className="text-xs font-bold text-yellow-800 uppercase mb-2 flex items-center gap-2 relative z-10">
-                              <FileSearch size={14}/> Interviewer Notes
-                          </h4>
-                          <p className="text-yellow-900 font-medium text-sm leading-relaxed relative z-10 font-mono">
-                              {selectedCandidate.interviewNotes}
-                          </p>
-                      </div>
-                  </div>
-
-                  {/* Footer Actions */}
-                  <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
-                      <div className="flex flex-col">
-                          <span className="text-xs text-slate-500 font-bold uppercase">Hiring Cost</span>
-                          <span className="text-2xl font-bold text-green-600">${selectedCandidate.hireCost.toLocaleString()}</span>
-                          <span className="text-xs text-slate-400"> + ${selectedCandidate.salary}/mo salary</span>
-                      </div>
-                      <div className="flex gap-3">
-                          <Button variant="secondary" onClick={() => setSelectedCandidate(null)}>Close</Button>
-                          <Button 
-                              variant="success" 
-                              onClick={handleHireFromModal}
-                              disabled={state.cash < selectedCandidate.hireCost}
-                          >
-                              Hire Candidate
-                          </Button>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* EVENT MODAL OVERLAY */}
-      {activeEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden relative" style={{minWidth: "40vw", maxWidth: "60vw"}}>
-                  {/* Event Header */}
-                  <div className={`p-6 text-white ${activeEvent.type === 'crisis' ? 'bg-red-500' : activeEvent.type === 'opportunity' ? 'bg-emerald-500' : 'bg-blue-600'}`}>
-                      <div className="flex items-center gap-2 mb-2 opacity-90 text-xs font-bold uppercase tracking-widest">
-                          {activeEvent.type === 'crisis' ? <AlertOctagon size={16}/> : activeEvent.type === 'opportunity' ? <Sparkles size={16}/> : <HelpCircle size={16}/>}
-                          Incoming Alert
-                      </div>
-                      <h2 className="text-2xl font-bold font-heading">{activeEvent.title}</h2>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="p-8">
-                      <p className="text-slate-700 text-lg leading-relaxed mb-8 font-medium">
-                          {activeEvent.description}
-                      </p>
-                      
-                      <div className="space-y-3">
-                          {activeEvent.options?.map((opt, idx) => (
-                              <button 
-                                  key={idx}
-                                  onClick={() => handleEventChoice(opt.label)}
-                                  className="w-full text-left p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition-all group relative overflow-hidden"
-                              >
-                                  <div className="flex justify-between items-center relative z-10">
-                                      <span className="font-bold text-slate-800 group-hover:text-blue-700">{opt.label}</span>
-                                      <span className="text-xs font-bold px-2 py-1 rounded bg-slate-200 text-slate-600 group-hover:bg-blue-200 group-hover:text-blue-800">{opt.risk}</span>
-                                  </div>
-                              </button>
-                          ))}
-                          
-                          <button 
-                             onClick={() => handleEventChoice("Ignore")}
-                             className="w-full text-center p-3 text-slate-400 hover:text-slate-600 text-sm font-medium transition-colors"
-                          >
-                              Ignore & Continue
-                          </button>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* Left Column: Stats & Dashboard */}
-      <div className="lg:col-span-8 flex flex-col gap-6 w-full">
+    <div className="fixed inset-0 bg-[#f1f5f9] flex flex-col md:flex-row overflow-hidden text-slate-900 font-sans">
         
-        {/* Header & Stats */}
-        <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight font-heading flex items-center gap-3">
-                        {state.companyName}
-                        <span className="text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-mono tracking-wider font-bold">
-                            WEEK {state.turn.toString().padStart(2, '0')}
-                        </span>
-                    </h2>
-                    <div className="flex items-center gap-3 text-slate-500 text-sm mt-1 font-medium">
-                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{state.industry}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                        <span className="flex items-center gap-1 text-slate-700 font-bold"><PieChart size={14} className="text-yellow-500"/> {state.equity}% Equity</span>
-                    </div>
+        {/* === TOP HUD (Global Stats) === */}
+        <div className="fixed top-0 left-0 right-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shadow-sm">
+            <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold font-heading shadow-lg shadow-blue-200/50">
+                    {state.companyName.charAt(0)}
+                </div>
+                <div className="hidden md:block">
+                    <h1 className="font-bold text-slate-900 leading-tight">{state.companyName}</h1>
+                    <div className="text-xs text-slate-500 font-medium">{state.industry}</div>
+                </div>
+                <div className="md:hidden flex flex-col">
+                    <span className="text-sm font-bold">{t('dashboard.week')} {state.turn}</span>
+                    <span className="text-xs text-slate-500">${state.cash.toLocaleString()}</span>
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard 
-                    label="Funds" 
-                    value={`$${state.cash.toLocaleString()}`} 
-                    icon={<DollarSign size={18} className="text-green-600" />} 
-                    change={latestResult?.cashChange}
-                    colorClass="bg-green-100 text-green-600"
-                />
-                <StatCard 
-                    label="Active Users" 
-                    value={state.users.toLocaleString()} 
-                    icon={<Users size={18} className="text-blue-600" />} 
-                    change={latestResult?.userChange}
-                    colorClass="bg-blue-100 text-blue-600"
-                />
-                <StatCard 
-                    label="Team Morale" 
-                    value={state.morale} 
-                    suffix="%"
-                    icon={<Zap size={18} className="text-yellow-600" />} 
-                    change={latestResult?.moraleChange}
-                    colorClass="bg-yellow-100 text-yellow-600"
-                />
-                <StatCard 
-                    label="Products" 
-                    value={state.products.length} 
-                    icon={<Package size={18} className="text-purple-600" />} 
-                    colorClass="bg-purple-100 text-purple-600"
-                />
+            {/* Desktop Stats Bar */}
+            <div className="hidden md:flex items-center gap-6">
+                 <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                     <span className="text-xs text-slate-500 font-bold uppercase">{t('dashboard.week')}</span>
+                     <span className="font-mono font-bold text-slate-800 text-lg">{state.turn.toString().padStart(2, '0')}</span>
+                 </div>
+                 <div className="h-8 w-px bg-slate-200"></div>
+                 <div className="flex gap-6">
+                     <div className="flex flex-col items-end">
+                         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.stats.funds')}</span>
+                         <span className={`font-heading font-bold text-lg ${state.cash < 2000 ? 'text-rose-600' : 'text-slate-900'}`}>${state.cash.toLocaleString()}</span>
+                     </div>
+                     <div className="flex flex-col items-end">
+                         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.stats.users')}</span>
+                         <span className="font-heading font-bold text-lg text-blue-600">{state.users.toLocaleString()}</span>
+                     </div>
+                     <div className="flex flex-col items-end">
+                         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Reputation</span>
+                         <span className="font-heading font-bold text-lg text-purple-600">{state.reputation}</span>
+                     </div>
+                 </div>
+            </div>
+
+            {/* Mobile Actions */}
+            <div className="md:hidden flex items-center gap-2">
+                 <button 
+                    onClick={() => setIsCommandOpen(true)} 
+                    className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors relative"
+                 >
+                     <BrainCircuit size={20}/>
+                     <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                 </button>
             </div>
         </div>
 
-        {/* --- MAIN DASHBOARD AREA --- */}
-        <div className="bg-white/60 backdrop-blur-xl border border-white/50 rounded-3xl p-1 min-h-[600px] flex flex-col shadow-xl shadow-slate-200/50">
+        {/* === SIDEBAR (Desktop) === */}
+        <div className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 pt-20 pb-4 px-3 gap-1 shrink-0 z-10 overflow-y-auto custom-scrollbar">
+            <div className="text-xs font-bold text-slate-400 px-4 py-2 uppercase tracking-wider mb-1">Operations</div>
+            <SidebarItem id="overview" label={t('dashboard.tabs.overview')} icon={<LayoutDashboard/>} />
+            <SidebarItem id="products" label={t('dashboard.tabs.products')} icon={<Package/>} />
+            <SidebarItem id="contracts" label={t('dashboard.tabs.contracts')} icon={<ScrollText/>} />
+            <SidebarItem id="investment" label={t('dashboard.tabs.investment')} icon={<Handshake/>} />
             
-            {/* Tab Navigation */}
-            <div className="flex p-1 gap-1 border-b border-slate-200/50 bg-white/50 rounded-t-3xl overflow-x-auto">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold transition-all rounded-xl whitespace-nowrap
-                        ${activeTab === tab.id 
-                            ? 'bg-white text-blue-700 shadow-sm ring-1 ring-black/5' 
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                        }`}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
-            </div>
+            <div className="h-px bg-slate-100 my-3 mx-4"></div>
+            <div className="text-xs font-bold text-slate-400 px-4 py-2 uppercase tracking-wider mb-1">Administration</div>
+            <SidebarItem id="team" label={t('dashboard.tabs.team')} icon={<Users/>} />
+            <SidebarItem id="infra" label={t('dashboard.tabs.infra')} icon={<Server/>} />
+            <SidebarItem id="report" label={t('dashboard.tabs.report')} icon={<ClipboardList/>} />
+            
+            {hasSecretary && (
+                <>
+                <div className="h-px bg-slate-100 my-3 mx-4"></div>
+                <button onClick={() => openChat(secretary)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-pink-50 text-slate-600 hover:text-pink-600 transition-colors group mt-auto">
+                    <div className="relative p-1 bg-pink-100 rounded-lg text-pink-600 group-hover:bg-pink-200 transition-colors">
+                        <MessageSquare size={18}/>
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-pink-500 rounded-full border-2 border-white"></span>
+                    </div>
+                    <span className="font-bold text-sm">Secretary</span>
+                </button>
+                </>
+            )}
+        </div>
 
-            <div className="p-6 flex-1 bg-white/40 rounded-b-3xl">
-                
-                {/* OVERVIEW TAB */}
-                {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 gap-6 h-full content-start">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[300px]">
-                                <h3 className="text-slate-500 text-xs font-bold mb-4 uppercase flex items-center gap-2">
-                                    <TrendingUp size={14} className="text-green-500"/> Growth Trajectory
-                                </h3>
-                                <div className="flex-1">
+        {/* === MAIN CONTENT === */}
+        <div className="flex-1 flex flex-col h-full pt-16 pb-20 md:pb-0 relative overflow-hidden bg-[#f8fafc]">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar scroll-smooth">
+                 <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 pb-24">
+                     
+                     {/* OVERVIEW TAB */}
+                     {activeTab === 'overview' && (
+                         <div className="grid grid-cols-1 gap-6 animate-fadeIn">
+                             {/* Stats Grid */}
+                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+                                 <StatCard label={t('dashboard.stats.netProfit')} value={Math.abs(netIncome).toLocaleString()} icon={<Wallet/>} suffix="$" change={0} colorClass={netIncome >= 0 ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50"}/>
+                                 <StatCard label={t('dashboard.stats.runway')} value={runway === 999 ? "∞" : runway} icon={<CreditCard/>} suffix=" mo" colorClass="text-purple-600 bg-purple-50"/>
+                                 <StatCard label={t('dashboard.stats.morale')} value={state.morale} icon={<Zap/>} suffix="%" change={latestResult?.moraleChange} colorClass="text-amber-500 bg-amber-50"/>
+                                 <StatCard label={t('dashboard.stats.marketShare')} value={state.marketShare.toFixed(1)} icon={<PieChart/>} suffix="%" colorClass="text-blue-600 bg-blue-50"/>
+                             </div>
+
+                             {/* Growth Chart */}
+                             <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm h-[320px] flex flex-col">
+                                 <h3 className="text-slate-500 text-xs font-bold uppercase mb-4 flex items-center gap-2 tracking-wider"><TrendingUp size={16} className="text-emerald-500"/> User Growth</h3>
+                                 <div className="flex-1 w-full min-h-0 -ml-2">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={growthChartData}>
+                                        <AreaChart data={chartData}>
                                             <defs>
                                                 <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -539,702 +281,584 @@ const GameDashboard: React.FC<GameDashboardProps> = ({
                                                 </linearGradient>
                                             </defs>
                                             <Tooltip 
-                                                contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                                itemStyle={{ color: '#2563eb', fontWeight: 'bold' }} 
+                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontFamily: 'Inter' }}
+                                                itemStyle={{ color: '#2563eb', fontWeight: 600 }}
                                             />
-                                            <Area type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" />
+                                            <Area type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={3} fill="url(#colorUsers)" />
                                         </AreaChart>
                                     </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                                    <div className="text-xs text-slate-500 uppercase font-bold mb-2">Market Share</div>
-                                    <div className="flex items-end gap-2">
-                                        <div className="text-4xl font-bold text-slate-900 font-heading">{state.marketShare.toFixed(1)}%</div>
-                                        <div className="text-xs text-slate-400 mb-1.5">of Total Addressable Market</div>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-3 rounded-full mt-4 overflow-hidden">
-                                        <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full" style={{width: `${Math.min(100, state.marketShare)}%`}}></div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex-1">
-                                    <div className="text-xs text-slate-500 uppercase font-bold mb-3">Key Competitor</div>
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-3 bg-red-50 rounded-xl text-red-500 border border-red-100">
-                                            <ShieldAlert size={24} />
-                                        </div>
-                                        <div>
-                                            <div className="text-base font-bold text-slate-800">{state.competitorName}</div>
-                                            <div className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-3">
-                                                "{state.marketContext}"
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* COMPANY HEALTH DASHBOARD */}
-                        <div className="mt-4">
-                            <h3 className="text-slate-500 text-xs font-bold mb-4 uppercase flex items-center gap-2">
-                                <BarChart3 size={14} className="text-blue-500"/> Company Health & Financials
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                {/* P&L Card */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-400 font-bold uppercase">Net Profit/Loss</span>
-                                        <Wallet size={16} className={netIncome >= 0 ? "text-green-500" : "text-red-500"}/>
-                                    </div>
-                                    <div className={`text-2xl font-bold font-heading ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                        {netIncome >= 0 ? '+' : '-'}${Math.abs(netIncome).toLocaleString()}
-                                    </div>
-                                    <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden flex">
-                                        <div className="h-full bg-green-500" style={{width: `${(totalRevenue / (totalRevenue + totalExpenses || 1)) * 100}%`}}></div>
-                                        <div className="h-full bg-red-500" style={{width: `${(totalExpenses / (totalRevenue + totalExpenses || 1)) * 100}%`}}></div>
-                                    </div>
-                                    <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                                        <span>Rev: ${totalRevenue.toLocaleString()}</span>
-                                        <span>Exp: ${totalExpenses.toLocaleString()}</span>
-                                    </div>
-                                </div>
-
-                                {/* Burn Rate & Runway */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-400 font-bold uppercase">Runway</span>
-                                        <CreditCard size={16} className="text-purple-500"/>
-                                    </div>
-                                    <div className="text-2xl font-bold font-heading text-slate-800">
-                                        {runway === 999 ? "∞" : runway} <span className="text-sm font-normal text-slate-500">Months</span>
-                                    </div>
-                                    <div className="text-xs text-slate-500 mt-1">
-                                        Burn Rate: <span className="text-red-500 font-bold">${burnRate.toLocaleString()}/mo</span>
-                                    </div>
-                                    <div className="mt-2 text-[10px] text-slate-400 flex flex-wrap gap-1">
-                                        <span className="bg-slate-100 px-1.5 rounded">Sal: ${totalSalaries.toLocaleString()}</span>
-                                        <span className="bg-slate-100 px-1.5 rounded">Ops: ${facilityCosts.toLocaleString()}</span>
-                                        <span className="bg-slate-100 px-1.5 rounded">Mkt: ${marketingCost.toLocaleString()}</span>
-                                    </div>
-                                </div>
-
-                                {/* HR Stats */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-400 font-bold uppercase">Team Efficiency</span>
-                                        <Users size={16} className="text-blue-500"/>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div>
-                                            <div className="text-2xl font-bold font-heading text-slate-800">{state.employees.length}</div>
-                                            <div className="text-[10px] text-slate-400 uppercase">Headcount</div>
-                                        </div>
-                                        <div className="h-8 w-px bg-slate-200"></div>
-                                        <div>
-                                            <div className="text-2xl font-bold font-heading text-slate-800">{avgSkill}</div>
-                                            <div className="text-[10px] text-slate-400 uppercase">Avg Skill</div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3">
-                                        <div className="flex justify-between text-[10px] mb-1 font-bold">
-                                            <span className="text-slate-500">Stress Level</span>
-                                            <span className={avgStress > 70 ? "text-red-500" : "text-green-500"}>{avgStress}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                            <div className={`h-full ${avgStress > 70 ? 'bg-red-500' : avgStress > 40 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{width: `${avgStress}%`}}></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Marketing & Ops */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-400 font-bold uppercase">Company Age</span>
-                                        <History size={16} className="text-slate-400"/>
-                                    </div>
-                                    <div className="text-2xl font-bold font-heading text-slate-800">
-                                        Week {state.turn}
-                                    </div>
-                                    <div className="mt-2 space-y-1">
-                                        <div className="flex justify-between text-xs text-slate-600">
-                                            <span>Current Stage</span>
-                                            <span className="font-bold text-blue-600">{state.users > 100000 ? "Growth" : state.users > 1000 ? "Early" : "Seed"}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-slate-600">
-                                            <span>Est. Valuation</span>
-                                            <span className="font-bold text-green-600">${(totalRevenue * 12 * 5 || 10000).toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* PRODUCTS TAB */}
-                {activeTab === 'products' && (
-                    <div className="flex flex-col h-full space-y-6">
-                        {/* New Product Creator */}
-                        {isCreatingProduct ? (
-                            <div className="bg-white p-6 rounded-2xl border border-blue-200 shadow-lg animate-slideUp">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">Start New Product</h3>
-                                <div className="space-y-4">
-                                    <input 
-                                        className="w-full p-3 border rounded-xl" 
-                                        placeholder="Product Name"
-                                        value={newProdName}
-                                        onChange={(e) => setNewProdName(e.target.value)}
-                                    />
-                                    <input 
-                                        className="w-full p-3 border rounded-xl" 
-                                        placeholder="Description"
-                                        value={newProdDesc}
-                                        onChange={(e) => setNewProdDesc(e.target.value)}
-                                    />
-                                    <div className="flex gap-3">
-                                        <Button onClick={handleCreateProductSubmit}>Launch</Button>
-                                        <Button variant="secondary" onClick={() => setIsCreatingProduct(false)}>Cancel</Button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex justify-end">
-                                <Button onClick={() => setIsCreatingProduct(true)} className="text-sm">
-                                    <Plus size={16}/> New Product
-                                </Button>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 gap-6">
-                            {state.products.map(prod => (
-                                <div key={prod.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-purple-300 transition-all">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="text-xl font-bold text-slate-900 font-heading">{prod.name}</h3>
-                                            <span className="inline-block bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded mt-1 font-bold">
-                                                {prod.stage}
-                                            </span>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-2xl font-bold text-green-600">${prod.revenue.toLocaleString()}/mo</div>
-                                            <div className="text-xs text-slate-400">Revenue</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Development</div>
-                                            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mb-1">
-                                                <div className="bg-blue-500 h-full transition-all duration-500" style={{width: `${prod.developmentProgress}%`}}></div>
-                                            </div>
-                                            <div className="text-right text-xs font-bold text-blue-600">{prod.developmentProgress}% to next stage</div>
-                                        </div>
-                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
-                                            <div>
-                                                <div className="text-xs text-slate-500 uppercase font-bold">Quality</div>
-                                                <div className="text-lg font-bold text-slate-800 flex items-center gap-1">
-                                                    <Gem size={14} className="text-blue-400"/> {prod.quality}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-slate-500 uppercase font-bold">Bugs</div>
-                                                <div className="text-lg font-bold text-red-600 flex items-center gap-1">
-                                                    <Bug size={14}/> {prod.bugs}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Active Users</div>
-                                            <div className="text-xl font-bold text-slate-800">{prod.users.toLocaleString()}</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Feedback */}
-                                    {prod.activeFeedback.length > 0 && (
-                                        <div className="mb-4 bg-yellow-50 p-3 rounded-xl border border-yellow-100 text-sm text-yellow-800 italic">
-                                            "<Megaphone size={12} className="inline mr-1"/> {prod.activeFeedback[0]}"
-                                        </div>
-                                    )}
-
-                                    {/* Team Assignment */}
-                                    <div className="border-t border-slate-100 pt-4">
-                                        <div className="text-xs font-bold text-slate-400 uppercase mb-2">Assigned Team</div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {state.employees.map(emp => {
-                                                const isAssigned = emp.assignedProductId === prod.id;
-                                                return (
-                                                    <button
-                                                        key={emp.id}
-                                                        onClick={() => onAssignEmployee(emp.id, isAssigned ? null : prod.id)}
-                                                        className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1 ${
-                                                            isAssigned 
-                                                            ? 'bg-blue-600 text-white border-blue-600' 
-                                                            : emp.assignedProductId 
-                                                                ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-50 cursor-not-allowed' // Assigned elsewhere
-                                                                : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
-                                                        }`}
-                                                        disabled={!!emp.assignedProductId && !isAssigned}
-                                                    >
-                                                        {emp.name} ({emp.role})
-                                                        {isAssigned && <CheckCircle size={10}/>}
-                                                    </button>
-                                                )
-                                            })}
-                                            {state.employees.length === 0 && <span className="text-xs text-slate-400 italic">No employees available.</span>}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* SECRETARY REPORT TAB */}
-                {activeTab === 'secretary' && hasSecretary && (
-                    <div className="h-full flex flex-col">
-                        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-6 mb-6 flex items-start gap-4">
-                            <div className="bg-orange-100 p-3 rounded-full text-orange-600">
-                                <Coffee size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-orange-900 font-heading">Secretary's Desk</h3>
-                                <p className="text-orange-800/80 text-sm mt-1">
-                                    Xin chào Boss! Tôi là <span className="font-bold">{secretary.name}</span>. Đây là những tin đồn và thông tin hành lang tôi thu thập được.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
-                             {state.history.slice().reverse().map((hist, idx) => hist.secretaryReport ? (
-                                 <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative group hover:border-orange-200 transition-colors">
-                                     <div className="absolute top-4 right-4 text-xs font-bold text-slate-300 bg-slate-50 px-2 py-1 rounded">Week {state.history.length - idx}</div>
-                                     <div className="flex gap-3">
-                                         <MessageSquare size={16} className="text-slate-400 mt-1 shrink-0" />
-                                         <p className="text-slate-700 text-sm italic leading-relaxed">"{hist.secretaryReport}"</p>
-                                     </div>
                                  </div>
-                             ) : null)}
-                             {state.history.every(h => !h.secretaryReport) && (
-                                 <div className="text-center text-slate-400 py-10 italic">Chưa có tin đồn nào được thu thập...</div>
-                             )}
-                        </div>
-                    </div>
-                )}
+                             </div>
 
-                {/* WEEKLY REPORT TAB */}
-                {activeTab === 'report' && (
-                    <div className="h-full animate-fadeIn space-y-6">
-                        {latestResult ? (
-                            <>
-                                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
-                                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-0"></div>
-                                     <div className="relative z-10">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                                                <ClipboardList size={24} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-bold text-slate-900 font-heading">Executive Summary</h3>
-                                                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Week {state.turn - 1} Report</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="prose prose-slate max-w-none">
-                                            <p className="text-lg text-slate-700 leading-8 font-medium whitespace-pre-line">
-                                                {latestResult.narrative}
-                                            </p>
-                                        </div>
+                             {/* Company Health */}
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                     <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><Activity size={18} className="text-blue-500"/> Company Health</h3>
+                                     <div className="space-y-6">
+                                         <div>
+                                             <div className="flex justify-between text-sm mb-2 font-medium">
+                                                 <span className="text-slate-500">Avg Stress</span>
+                                                 <span className={`font-bold ${avgStress > 70 ? 'text-rose-500' : 'text-emerald-600'}`}>{avgStress}%</span>
+                                             </div>
+                                             <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                 <div className={`h-full ${avgStress > 70 ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{width: `${avgStress}%`}}></div>
+                                             </div>
+                                         </div>
+                                         <div>
+                                             <div className="flex justify-between text-sm mb-2 font-medium">
+                                                 <span className="text-slate-500">Avg Skill</span>
+                                                 <span className="font-bold text-blue-600">{avgSkill}/100</span>
+                                             </div>
+                                             <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                 <div className="bg-blue-500 h-full" style={{width: `${avgSkill}%`}}></div>
+                                             </div>
+                                         </div>
                                      </div>
-                                </div>
-                                <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex flex-col">
-                                    <div className="flex items-center gap-2 mb-3 text-indigo-700">
-                                        <BrainCircuit size={18} />
-                                        <span className="text-xs font-bold uppercase tracking-wider">Advisor Note</span>
-                                    </div>
-                                    <div className="flex-1 flex items-center">
-                                        <p className="text-indigo-900 text-base italic font-medium leading-relaxed">
-                                            "{latestResult.advice}"
-                                        </p>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 p-12 border-2 border-dashed border-slate-200 rounded-3xl">
-                                <FileText size={48} className="mb-4 opacity-20" />
-                                <p className="text-lg font-medium">Waiting for first week report...</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* HR TAB */}
-                {activeTab === 'hr' && (
-                    <div className="h-full flex flex-col">
-                        <div className="flex gap-2 mb-6 p-1 bg-slate-100 rounded-xl w-fit">
-                            <button 
-                                onClick={() => setHrSubTab('manage')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${hrSubTab === 'manage' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Management
-                            </button>
-                            <button 
-                                onClick={() => setHrSubTab('recruit')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${hrSubTab === 'recruit' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Recruitment
-                            </button>
-                        </div>
-
-                        {hrSubTab === 'manage' && (
-                            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {state.employees.map(emp => (
-                                        <div key={emp.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 transition-all group relative">
-                                            <button 
-                                                onClick={() => openChat(emp)}
-                                                className="absolute top-4 right-14 p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                                            >
-                                                <MessageCircle size={18} />
-                                            </button>
-                                            <button onClick={() => onFire(emp.id)} className="absolute top-4 right-4 p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors">
-                                                <XCircle size={18}/>
-                                            </button>
-
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
-                                                    {emp.name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-slate-900">{emp.name}</h4>
-                                                    <div className="text-xs font-bold text-blue-600 uppercase tracking-wide">{emp.level} {emp.role}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-3 mb-4">
-                                                <div>
-                                                    <div className="flex justify-between text-xs mb-1">
-                                                        <span className="font-bold text-slate-500 flex items-center gap-1"><Zap size={10}/> Morale</span>
-                                                        <span className={`font-bold ${emp.morale < 30 ? 'text-red-500' : 'text-slate-700'}`}>{Math.round(emp.morale)}%</span>
-                                                    </div>
-                                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full transition-all duration-500 ${emp.morale < 30 ? 'bg-red-500' : 'bg-yellow-400'}`} style={{width: `${emp.morale}%`}}></div>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="flex justify-between text-xs mb-1">
-                                                        <span className="font-bold text-slate-500 flex items-center gap-1"><BatteryWarning size={10}/> Stress</span>
-                                                        <span className={`font-bold ${emp.stress > 70 ? 'text-red-500' : 'text-slate-700'}`}>{Math.round(emp.stress)}%</span>
-                                                    </div>
-                                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full transition-all duration-500 ${emp.stress > 70 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${emp.stress}%`}}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
-                                                <span>Salary: <b>${emp.salary.toLocaleString()}/mo</b></span>
-                                                {emp.assignedProductId && <span className="text-blue-600 font-bold">On Product</span>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {state.employees.length === 0 && (
-                                        <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-400">
-                                            <Users size={48} className="mx-auto mb-3 opacity-20"/>
-                                            <p className="font-medium">No active employees</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {hrSubTab === 'recruit' && (
-                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-full">
-                                <div className="flex flex-col h-full">
-                                    <div className="mb-4">
-                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
-                                            <div className="relative">
-                                                <textarea
-                                                    value={jobDescription}
-                                                    onChange={(e) => setJobDescription(e.target.value)}
-                                                    placeholder="Describe the role... (e.g. 'Rockstar AI Engineer needed' or 'Need a Secretary')"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none h-24"
-                                                />
-                                                <div className="absolute bottom-3 right-3">
-                                                    <Button onClick={() => onRecruit(jobDescription)} disabled={state.cash < 500 || isProcessing || !jobDescription.trim()} variant="primary" className="text-xs py-1.5 px-3 h-8 shadow-sm">
-                                                        Headhunt ($500)
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 space-y-4 overflow-y-auto max-h-[400px] pr-1">
-                                        {state.candidates.map(cand => (
-                                            <div key={cand.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-lg transition-all">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <div className="font-bold text-slate-900">{cand.name}</div>
-                                                        <div className="text-xs text-blue-600 font-bold">{cand.level} {cand.role}</div>
-                                                    </div>
-                                                    <div className="text-green-600 font-bold text-sm">${cand.hireCost}</div>
-                                                </div>
-                                                <div className="text-xs text-slate-500 mb-2">Skills: {cand.specificSkills.join(', ')}</div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <Button onClick={() => setSelectedCandidate(cand)} variant="secondary" className="w-full py-1 text-xs">View CV</Button>
-                                                    <Button onClick={() => onHireCandidate(cand)} disabled={state.cash < cand.hireCost} className="w-full py-1 text-xs" variant="success">Hire</Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* FACILITIES TAB */}
-                {activeTab === 'facilities' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         {state.facilities.map(fac => (
-                             <div key={fac.id} className="bg-white p-6 rounded-2xl border border-slate-200 relative overflow-hidden group hover:border-blue-300 hover:shadow-md transition-all">
-                                 {/* Background Icon */}
-                                 <div className="absolute -bottom-4 -right-4 text-slate-100 group-hover:text-blue-50 transition-all transform group-hover:scale-110 group-hover:-rotate-12">
-                                     {fac.id === 'office' ? <Briefcase size={120} /> : <Server size={120} />}
                                  </div>
                                  
-                                 <div className="relative z-10">
-                                     <div className="flex justify-between items-start mb-4">
-                                         <div>
-                                            <h4 className="font-bold text-xl text-slate-900 font-heading">{fac.name}</h4>
-                                            <div className="text-blue-600 text-xs font-bold uppercase tracking-widest mt-1">Level {fac.level}</div>
-                                         </div>
-                                         {fac.id === 'server' ? <Server className="text-slate-400"/> : <Briefcase className="text-slate-400"/>}
-                                     </div>
-                                     
-                                     <p className="text-slate-600 text-sm mb-6 h-12 leading-relaxed">{fac.description}</p>
-                                     
-                                     <div className="flex items-center gap-2 text-xs font-bold text-yellow-700 mb-6 bg-yellow-50 px-3 py-2 rounded-lg w-fit border border-yellow-100">
-                                         <Zap size={14}/> {fac.benefit}
-                                     </div>
-                                     
-                                     {fac.level < fac.maxLevel ? (
-                                        <Button 
-                                            variant="secondary"
-                                            onClick={() => onUpgradeFacility(fac.id)}
-                                            disabled={state.cash < fac.costToUpgrade || isProcessing}
-                                            className="w-full text-sm py-3 border-slate-200 hover:bg-slate-50 text-slate-700"
-                                        >
-                                            Upgrade <ChevronUp size={16}/> (${fac.costToUpgrade.toLocaleString()})
-                                        </Button>
-                                     ) : (
-                                         <div className="w-full text-center py-3 text-sm text-green-600 font-bold bg-green-50 rounded-lg border border-green-100">
-                                             MAX LEVEL REACHED
-                                         </div>
-                                     )}
+                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center relative overflow-hidden group">
+                                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-white opacity-50"></div>
+                                      <div className="relative z-10">
+                                          <div className="w-20 h-20 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center mb-4 mx-auto">
+                                              <Target size={36} className="text-indigo-500"/>
+                                          </div>
+                                          <div className="text-3xl font-bold font-heading text-slate-900 mb-1">{state.stage}</div>
+                                          <div className="text-sm text-slate-500 uppercase font-bold tracking-wider">Current Stage</div>
+                                      </div>
                                  </div>
                              </div>
-                         ))}
-                    </div>
-                )}
-                
-                {/* PROFILE TAB */}
-                 {activeTab === 'profile' && (
-                    <div className="max-w-xl mx-auto py-6">
-                         <div className="text-center mb-8 relative">
-                             <div className="w-24 h-24 bg-gradient-to-tr from-blue-500 to-purple-600 rounded-3xl mx-auto flex items-center justify-center text-3xl font-bold text-white mb-4 shadow-xl shadow-blue-200 rotate-3 transform hover:rotate-0 transition-all duration-500">
-                                 CEO
-                             </div>
-                             <h3 className="text-2xl font-bold text-slate-900 font-heading">{state.companyName} Founder</h3>
-                             <p className="text-slate-500 text-sm mt-1 font-medium">Tech Visionary & Serial Entrepreneur</p>
                          </div>
-                         
-                         <div className="space-y-6 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                             {[
-                                { label: 'Management', val: state.playerSkills.management, desc: 'Giữ morale, tối ưu lương & tuyển dụng', color: 'bg-blue-500' },
-                                { label: 'Tech Vision', val: state.playerSkills.tech, desc: 'Tăng chất lượng R&D và giảm lỗi', color: 'bg-purple-500' },
-                                { label: 'Charisma', val: state.playerSkills.charisma, desc: 'Gọi vốn & Marketing tốt hơn', color: 'bg-orange-500' }
-                             ].map((skill, idx) => (
-                                <div key={idx}>
-                                    <div className="flex justify-between text-sm mb-2">
-                                        <span className="text-slate-700 font-bold tracking-wide">{skill.label}</span>
-                                        <span className="text-slate-800 font-mono bg-slate-100 px-2 rounded border border-slate-200">{skill.val}/10</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 relative">
-                                        <div className={`absolute top-0 left-0 h-full ${skill.color} transition-all duration-1000 shadow-sm`} style={{width: `${skill.val * 10}%`}}></div>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-1.5 italic font-medium">{skill.desc}</p>
-                                </div>
+                     )}
+
+                     {/* PRODUCTS TAB */}
+                     {activeTab === 'products' && (
+                         <div className="animate-fadeIn space-y-6">
+                             <div className="flex justify-between items-center">
+                                 <h2 className="text-2xl font-bold font-heading text-slate-800">Product Portfolio</h2>
+                                 <Button onClick={() => setIsCreatingProduct(!isCreatingProduct)} variant="primary">
+                                     {isCreatingProduct ? 'Cancel' : 'New Product'}
+                                 </Button>
+                             </div>
+
+                             {isCreatingProduct && (
+                                 <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-lg ring-4 ring-indigo-50 animate-slideUp">
+                                     <h3 className="font-bold text-lg mb-4 text-indigo-700 flex items-center gap-2"><Rocket size={20}/> Launch New Product</h3>
+                                     <div className="space-y-4">
+                                         <input className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Product Name" value={newProdName} onChange={e => setNewProdName(e.target.value)} />
+                                         <input className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="One-line Description" value={newProdDesc} onChange={e => setNewProdDesc(e.target.value)} />
+                                         <Button onClick={handleCreateProductSubmit} className="w-full py-3" variant="primary">Start Development</Button>
+                                     </div>
+                                 </div>
+                             )}
+
+                             <div className="grid grid-cols-1 gap-5">
+                                 {state.products.map(p => (
+                                     <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
+                                         <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-500 to-indigo-600"></div>
+                                         <div className="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6 pl-4">
+                                             <div>
+                                                 <h3 className="text-2xl font-bold text-slate-900 leading-tight">{p.name}</h3>
+                                                 <span className="inline-block mt-2 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg uppercase tracking-wide border border-blue-100">{p.stage}</span>
+                                             </div>
+                                             <div className="text-right">
+                                                 <div className="text-3xl font-bold text-emerald-600 font-heading tracking-tight">${p.revenue.toLocaleString()}</div>
+                                                 <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Monthly Revenue</div>
+                                             </div>
+                                         </div>
+                                         
+                                         <div className="pl-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                             <div className="col-span-1 md:col-span-1">
+                                                 <div className="flex justify-between text-xs font-bold text-slate-500 mb-2"><span>Dev Progress</span><span>{p.developmentProgress}%</span></div>
+                                                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200"><div className="h-full bg-blue-500 transition-all duration-700" style={{width: `${p.developmentProgress}%`}}></div></div>
+                                             </div>
+                                             <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+                                                 <div className="text-xs font-bold text-slate-500 uppercase">Users</div>
+                                                 <div className="font-bold text-slate-800 text-lg">{p.users.toLocaleString()}</div>
+                                             </div>
+                                             <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+                                                 <div className="text-xs font-bold text-slate-500 uppercase">Quality</div>
+                                                 <div className={`font-bold text-lg ${p.quality > 80 ? 'text-emerald-600' : 'text-slate-800'}`}>{p.quality}/100</div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                     )}
+
+                     {/* CONTRACTS TAB */}
+                     {activeTab === 'contracts' && (
+                         <div className="animate-fadeIn space-y-6">
+                             <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                 <div>
+                                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Corporate Reputation</div>
+                                     <div className="text-4xl font-bold text-blue-900 font-heading">{state.reputation}/100</div>
+                                 </div>
+                                 <Button onClick={onFindContracts} disabled={isProcessing} className="shadow-lg shadow-blue-200">
+                                     <Search size={18}/> Find New Contracts
+                                 </Button>
+                             </div>
+
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                 <div className="space-y-4">
+                                     <h3 className="font-bold text-slate-700 flex items-center gap-2 uppercase text-xs tracking-widest"><Activity size={16} className="text-orange-500"/> Active Contracts</h3>
+                                     {state.contracts.filter(c => c.status === 'active').map(c => (
+                                         <div key={c.id} className="bg-white p-5 rounded-2xl border-l-4 border-l-orange-500 border border-slate-200 shadow-sm">
+                                             <div className="flex justify-between mb-3">
+                                                 <div className="font-bold text-lg text-slate-900">{c.name}</div>
+                                                 <div className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-md self-start">{c.deadlineWeeks} wks left</div>
+                                             </div>
+                                             <div className="mb-4">
+                                                 <div className="flex justify-between text-xs mb-1 font-bold text-slate-500"><span>Completion</span><span>{Math.round((c.currentEffort / c.totalEffortRequired) * 100)}%</span></div>
+                                                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden"><div className="bg-orange-500 h-full transition-all duration-500" style={{width: `${(c.currentEffort / c.totalEffortRequired) * 100}%`}}></div></div>
+                                             </div>
+                                             <div className="flex items-center justify-between pt-4 border-t border-slate-100 gap-4">
+                                                  <div className="text-xs font-bold text-slate-400 uppercase shrink-0">Team</div>
+                                                  <select className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-700 outline-none" onChange={(e) => onAssignEmployee(e.target.value, c.id)} value="">
+                                                      <option value="">+ Assign Staff</option>
+                                                      {state.employees.filter(e => !e.assignedContractId && !e.assignedProductId).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                                  </select>
+                                             </div>
+                                             <div className="flex flex-wrap gap-2 mt-3">
+                                                 {state.employees.filter(e => e.assignedContractId === c.id).map(e => (
+                                                     <span key={e.id} className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
+                                                         {e.name} <button onClick={() => onAssignEmployee(e.id, null)} className="hover:text-red-500"><X size={12}/></button>
+                                                     </span>
+                                                 ))}
+                                             </div>
+                                         </div>
+                                     ))}
+                                     {state.contracts.filter(c => c.status === 'active').length === 0 && <div className="text-center p-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 text-sm italic">No active contracts</div>}
+                                 </div>
+
+                                 <div className="space-y-4">
+                                     <h3 className="font-bold text-slate-700 flex items-center gap-2 uppercase text-xs tracking-widest"><BriefcaseIcon size={16} className="text-blue-500"/> Available Opportunities</h3>
+                                     {state.contracts.filter(c => c.status === 'available').map(c => (
+                                         <div key={c.id} className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-400 transition-colors group shadow-sm">
+                                             <div className="flex justify-between items-start mb-2">
+                                                 <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-lg">{c.name}</div>
+                                                 <div className="text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-md text-sm border border-emerald-100 shadow-sm">+${c.reward}</div>
+                                             </div>
+                                             <p className="text-sm text-slate-500 mb-4 line-clamp-2 leading-relaxed">{c.description}</p>
+                                             <div className="flex gap-2 mb-4">
+                                                 {c.reqSkills.map(s => <span key={s} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-md uppercase tracking-wide">{s}</span>)}
+                                             </div>
+                                             <Button onClick={() => onAcceptContract(c.id)} className="w-full py-2.5 text-xs" variant="secondary">Accept Contract</Button>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         </div>
+                     )}
+
+                     {/* INVESTMENT TAB */}
+                     {activeTab === 'investment' && (
+                         <div className="animate-fadeIn space-y-6">
+                              <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+                                  <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                                  <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                                      <div>
+                                          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Estimated Valuation</div>
+                                          <div className="text-4xl md:text-5xl font-heading font-bold text-white tracking-tight">${(totalRevenue * 12 * 5 || 10000).toLocaleString()}</div>
+                                      </div>
+                                      <div className="flex gap-3">
+                                          <Button onClick={onAskAdvice} className="bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur-md">Board Advice</Button>
+                                          <Button onClick={onFindInvestor} className="bg-white text-slate-900 hover:bg-slate-100 border-none shadow-lg">Find Investors</Button>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  {state.investors.map(inv => (
+                                      <div key={inv.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                                          <div className="p-6 flex-1">
+                                              <div className="flex items-center gap-4 mb-4">
+                                                  <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-xl font-bold border-2 border-white shadow-sm">{inv.name.charAt(0)}</div>
+                                                  <div>
+                                                      <div className="font-bold text-slate-900 text-lg leading-tight">{inv.name}</div>
+                                                      <div className="text-xs text-slate-500 font-bold uppercase">{inv.style} Investor</div>
+                                                  </div>
+                                              </div>
+                                              <p className="text-sm text-slate-600 italic mb-6 leading-relaxed relative pl-4 border-l-2 border-slate-200">"{inv.description}"</p>
+                                              
+                                              {inv.status !== 'partner' && inv.status !== 'rejected' && (
+                                                  <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-100">
+                                                      <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">Offer</span><span className="font-bold text-emerald-600">${inv.offerAmount.toLocaleString()}</span></div>
+                                                      <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">Equity</span><span className="font-bold text-slate-900">{inv.equityDemanded}%</span></div>
+                                                  </div>
+                                              )}
+                                              {inv.status === 'partner' && <div className="text-center py-4 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm border border-emerald-100">PARTNER</div>}
+                                              {inv.status === 'rejected' && <div className="text-center py-4 bg-rose-50 text-rose-700 font-bold rounded-xl text-sm border border-rose-100">REJECTED</div>}
+                                          </div>
+                                          
+                                          {inv.status !== 'partner' && inv.status !== 'rejected' && (
+                                              <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                                                  <Button onClick={() => setActiveNegotiationId(inv.id)} className="w-full">Negotiate Deal</Button>
+                                              </div>
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
+                         </div>
+                     )}
+
+                     {/* TEAM (HR) TAB */}
+                     {activeTab === 'team' && (
+                         <div className="space-y-6 animate-fadeIn">
+                             <div className="flex gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit shadow-sm">
+                                 <button onClick={() => setHrSubTab('manage')} className={`px-5 py-2 font-bold text-sm rounded-lg transition-all ${hrSubTab === 'manage' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>Manage Team</button>
+                                 <button onClick={() => setHrSubTab('recruit')} className={`px-5 py-2 font-bold text-sm rounded-lg transition-all ${hrSubTab === 'recruit' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>Recruit</button>
+                             </div>
+
+                             {hrSubTab === 'manage' ? (
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     {state.employees.map(emp => (
+                                         <div key={emp.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-300 transition-colors">
+                                             <div className="flex justify-between items-start mb-4">
+                                                 <div className="flex items-center gap-3">
+                                                     <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100">{emp.name.charAt(0)}</div>
+                                                     <div>
+                                                         <div className="font-bold text-slate-900 text-lg">{emp.name}</div>
+                                                         <div className="text-xs text-slate-500 font-bold uppercase tracking-wide">{emp.role}</div>
+                                                     </div>
+                                                 </div>
+                                                 <div className="text-xs font-bold bg-slate-100 px-2.5 py-1 rounded-md text-slate-600 border border-slate-200">{emp.level}</div>
+                                             </div>
+                                             
+                                             <div className="grid grid-cols-3 gap-2 text-center mb-5">
+                                                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-100"><div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Skill</div><div className="font-bold text-slate-800 text-lg leading-none">{emp.skill}</div></div>
+                                                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-100"><div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Morale</div><div className={`font-bold text-lg leading-none ${emp.morale < 50 ? 'text-rose-500' : 'text-emerald-500'}`}>{emp.morale}</div></div>
+                                                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-100"><div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Wage</div><div className="font-bold text-slate-800 text-lg leading-none">${emp.salary}</div></div>
+                                             </div>
+
+                                             <div className="flex gap-3">
+                                                 <button onClick={() => openChat(emp)} className="flex-1 py-2.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors">Chat</button>
+                                                 <button onClick={() => onFire(emp.id)} className="flex-1 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">Fire</button>
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             ) : (
+                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                     <div className="mb-8 space-y-4 max-w-lg mx-auto bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                         <h3 className="text-center font-bold text-slate-800 text-lg">Headhunting Params</h3>
+                                         <div>
+                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Role Description</label>
+                                             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Senior React Dev" value={jobDescription} onChange={e => setJobDescription(e.target.value)} />
+                                         </div>
+                                         <div>
+                                             <div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-500 uppercase">Max Budget</label><span className="font-bold text-blue-600">${recruitBudget}</span></div>
+                                             <input type="range" min="500" max="5000" step="100" value={recruitBudget} onChange={e => setRecruitBudget(Number(e.target.value))} className="w-full accent-blue-600"/>
+                                         </div>
+                                         <Button onClick={() => onRecruit(jobDescription, recruitBudget)} disabled={isProcessing} className="w-full py-3 shadow-md">Find Candidates</Button>
+                                     </div>
+                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                         {state.candidates.map(c => (
+                                             <div key={c.id} className="border-2 border-slate-100 bg-white p-5 rounded-2xl hover:border-blue-400 cursor-pointer transition-all group" onClick={() => setSelectedCandidate(c)}>
+                                                 <div className="font-bold text-slate-900 text-lg group-hover:text-blue-600 transition-colors">{c.name}</div>
+                                                 <div className="text-xs text-slate-500 font-medium mb-3">{c.level} {c.role}</div>
+                                                 <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
+                                                     <span className="text-xs font-bold text-slate-400">Ask</span>
+                                                     <span className="text-sm font-bold text-emerald-600">${c.salary}/mo</span>
+                                                 </div>
+                                                 <Button className="w-full mt-3 text-xs py-2" variant="secondary">View Profile</Button>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+                             )}
+                         </div>
+                     )}
+
+                     {/* INFRA TAB */}
+                     {activeTab === 'infra' && (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
+                             {state.facilities.map(fac => (
+                                 <div key={fac.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                     <div className="flex items-center gap-4 mb-4">
+                                         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
+                                             {fac.id === 'office' ? <Building2 size={28}/> : <Server size={28}/>}
+                                         </div>
+                                         <div>
+                                             <h3 className="font-bold text-xl text-slate-900">{fac.name}</h3>
+                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mt-1">Level {fac.level} <span className="text-slate-300 mx-1">/</span> {fac.maxLevel}</div>
+                                         </div>
+                                     </div>
+                                     <p className="text-sm text-slate-600 mb-6 flex-1">{fac.benefit}</p>
+                                     <Button 
+                                         onClick={() => onUpgradeFacility(fac.id)} 
+                                         disabled={fac.level >= fac.maxLevel || state.cash < fac.costToUpgrade} 
+                                         className="w-full py-3"
+                                         variant={fac.level >= fac.maxLevel ? 'secondary' : 'primary'}
+                                     >
+                                         {fac.level >= fac.maxLevel ? "Maxed Out" : `Upgrade ($${fac.costToUpgrade.toLocaleString()})`}
+                                     </Button>
+                                 </div>
                              ))}
                          </div>
-                    </div>
-                )}
-            </div>
-        </div>
-      </div>
-
-      {/* Right Column: Actions (Sticky Sidebar) */}
-      <div className="lg:col-span-4 flex flex-col h-[calc(100vh-2rem)] sticky top-4 bg-white/90 border border-white/60 backdrop-blur-xl rounded-3xl shadow-2xl shadow-slate-200/50 overflow-hidden ring-1 ring-slate-200"
-      style={{position: 'fixed', right: "2rem", maxWidth: "450px"}}
-      >
-        <div className="p-6 border-b border-slate-100 bg-white/50 flex justify-between items-center shrink-0">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 font-heading tracking-wide">
-                <BrainCircuit size={20} className="text-blue-600"/>
-                Command Center
-            </h3>
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-sm"></div>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-            
-            {/* PITCH RESULT NOTIFICATION */}
-            {pitchResult && (
-                <div className={`p-4 rounded-xl border ${pitchResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} animate-slideUp`}>
-                    <h4 className="font-bold flex items-center gap-2">
-                        {pitchResult.success ? <CheckCircle size={16}/> : <XCircle size={16}/>}
-                        Investor Response
-                    </h4>
-                    <p className="text-sm mt-1">{pitchResult.message}</p>
-                </div>
-            )}
-
-            {/* INTEL */}
-             <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
-                <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Search size={14}/> Intelligence Network
-                </h4>
-                <div className="grid grid-cols-1 gap-2">
-                    {INTEL_OPTIONS.map((opt) => (
-                        <button
-                            key={opt.type}
-                            disabled={state.cash < opt.cost || isProcessing || activeEvent !== null}
-                            onClick={() => onBuyIntel(opt.type, opt.cost)}
-                            className="flex items-center justify-between p-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed group text-left shadow-sm hover:shadow-md"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-slate-100 rounded-lg text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50 transition-colors">
-                                    {opt.icon}
-                                </div>
-                                <div>
-                                    <div className="text-sm font-bold text-slate-800">{opt.title}</div>
-                                    <div className="text-[10px] text-slate-500">{opt.desc}</div>
-                                </div>
-                            </div>
-                            <div className="text-xs font-bold text-green-700 bg-green-50 border border-green-100 px-2 py-1 rounded-md">
-                                ${opt.cost}
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* CEO DIRECTIVE */}
-            <div>
-                <label className="block text-xs font-bold text-purple-600 mb-2 flex items-center gap-2 uppercase tracking-wide">
-                    <Zap size={14} /> 
-                    Strategy Override
-                </label>
-                <div className="relative">
-                    <textarea 
-                        value={strategyNote}
-                        onChange={(e) => setStrategyNote(e.target.value)}
-                        disabled={activeEvent !== null}
-                        placeholder="Enter specific instructions for the AI..."
-                        className="w-full bg-white border border-slate-200 text-slate-800 rounded-2xl p-4 min-h-[80px] text-sm focus:ring-2 focus:ring-purple-500 outline-none resize-none"
-                    />
-                </div>
-            </div>
-
-            <div className="h-px bg-slate-200 my-2 w-full"></div>
-
-            {/* FUNDING (PITCH) */}
-            <div className="space-y-5">
-                <div>
-                    <label className="block text-xs font-bold text-yellow-600 mb-2 uppercase flex items-center gap-2 tracking-wide">
-                        <Landmark size={14} /> Funding Pitch
-                    </label>
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <select 
-                                value={fundingRound}
-                                onChange={(e) => setFundingRound(e.target.value)}
-                                disabled={activeEvent !== null || isProcessing}
-                                className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl p-3 focus:ring-2 focus:ring-yellow-500 outline-none text-sm font-medium appearance-none"
-                            >
-                                <option value="Seed Round ($200k)">Seed Round ($200k)</option>
-                                <option value="Series A ($1M)">Series A ($1M)</option>
-                                <option value="Series B ($5M)">Series B ($5M)</option>
-                            </select>
-                            <ChevronUp className="absolute right-3 top-3.5 text-slate-400 pointer-events-none rotate-180" size={16} />
-                        </div>
-                        <Button 
-                            onClick={handlePitchClick}
-                            disabled={isProcessing || activeEvent !== null}
-                            className="whitespace-nowrap bg-yellow-500 hover:bg-yellow-600 text-white shadow-yellow-200"
-                        >
-                            Pitch
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase">R&D Focus</label>
-                         <div className="relative">
-                            <select 
-                                value={rdFocus}
-                                onChange={(e) => setRdFocus(e.target.value)}
-                                disabled={activeEvent !== null}
-                                className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-xs shadow-sm appearance-none"
-                            >
-                                <option>Nâng cấp tính năng cốt lõi</option>
-                                <option>Sửa lỗi & Ổn định hệ thống</option>
-                                <option>Nghiên cứu công nghệ mới (AI)</option>
-                                <option>Cải thiện UI/UX</option>
-                            </select>
+                     )}
+                     
+                     {/* REPORT TAB */}
+                     {activeTab === 'report' && (
+                         <div className="space-y-4 animate-fadeIn">
+                             {state.history.slice().reverse().map((h, i) => (
+                                 <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded text-slate-600">Week {state.turn - i - 1}</span>
+                                         <span className={`font-mono text-sm font-bold ${h.cashChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                             {h.cashChange > 0 ? '+' : ''}{h.cashChange.toLocaleString()}$
+                                         </span>
+                                     </div>
+                                     <p className="text-slate-800 text-sm leading-relaxed">{h.narrative}</p>
+                                 </div>
+                             ))}
                          </div>
-                    </div>
+                     )}
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase">Marketing</label>
-                        <div className="relative">
-                            <select 
-                                value={marketingFocus}
-                                onChange={(e) => setMarketingFocus(e.target.value)}
-                                disabled={activeEvent !== null}
-                                className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-xs shadow-sm appearance-none"
-                            >
-                                <option>Chạy quảng cáo Facebook/Google</option>
-                                <option>Content Marketing (SEO)</option>
-                                <option>Thuê Influencer/KOL</option>
-                                <option>Tổ chức Event/Webinar</option>
-                                <option>Cold Emailing/Sales</option>
-                            </select>
+                 </div>
+            </div>
+        </div>
+
+        {/* === RIGHT SIDEBAR (Command Center - Desktop) / DRAWER (Mobile) === */}
+        <div className={`fixed inset-y-0 right-0 w-full md:w-80 bg-white border-l border-slate-200 transform transition-transform duration-300 z-40 flex flex-col shadow-2xl md:shadow-none
+            ${isCommandOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+        `}>
+             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 backdrop-blur-md h-16">
+                 <div className="flex items-center gap-2 font-bold text-slate-800 text-lg">
+                     <BrainCircuit className="text-blue-600"/> Command Center
+                 </div>
+                 <button onClick={() => setIsCommandOpen(false)} className="md:hidden p-2 rounded-full hover:bg-slate-200"><X size={24}/></button>
+             </div>
+
+             <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar bg-white">
+                 
+                 {/* Intel Section */}
+                 <div className="space-y-3">
+                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Intelligence</h4>
+                     <div className="grid grid-cols-1 gap-3">
+                         <button onClick={() => onBuyIntel(IntelType.MARKET, 500)} disabled={state.cash < 500} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left disabled:opacity-50">
+                             <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><TrendingUp size={18}/></div>
+                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">Market Research</div><div className="text-xs text-slate-500 font-mono">$500</div></div>
+                         </button>
+                         <button onClick={() => onBuyIntel(IntelType.COMPETITOR, 1200)} disabled={state.cash < 1200} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all text-left disabled:opacity-50">
+                             <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Eye size={18}/></div>
+                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">Competitor Spy</div><div className="text-xs text-slate-500 font-mono">$1200</div></div>
+                         </button>
+                     </div>
+                 </div>
+
+                 {/* Strategy Section */}
+                 <div className="space-y-4">
+                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Directives</h4>
+                     
+                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1"><Settings2 size={12}/> R&D Priority</label>
+                         <select value={rdFocus} onChange={e => setRdFocus(e.target.value)} className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                             <option>Nâng cấp tính năng cốt lõi</option>
+                             <option>Sửa lỗi & Ổn định hệ thống</option>
+                             <option>Nghiên cứu công nghệ mới (AI)</option>
+                         </select>
+                     </div>
+                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1"><Megaphone size={12}/> Marketing Focus</label>
+                         <select value={marketingFocus} onChange={e => setMarketingFocus(e.target.value)} className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                             <option>Chạy quảng cáo Facebook/Google</option>
+                             <option>Content Marketing (SEO)</option>
+                             <option>Thuê Influencer/KOL</option>
+                         </select>
+                     </div>
+                     <div>
+                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block">CEO Note</label>
+                         <textarea value={strategyNote} onChange={e => setStrategyNote(e.target.value)} className="w-full h-24 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none outline-none focus:ring-2 focus:ring-blue-500" placeholder="E.g. Focus on quality over speed..."></textarea>
+                     </div>
+                 </div>
+
+                 {/* Funding */}
+                 <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 space-y-3">
+                     <div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><Landmark size={16}/> External Funding</div>
+                     <select value={fundingRound} onChange={e => setFundingRound(e.target.value)} className="w-full text-xs p-2.5 bg-white/80 border border-amber-200 rounded-lg font-medium outline-none text-amber-900">
+                         <option>Seed Round ($200k)</option>
+                         <option>Series A ($1M)</option>
+                         <option>Series B ($5M)</option>
+                     </select>
+                     <Button onClick={handlePitchClick} className="w-full text-xs bg-amber-600 hover:bg-amber-700 text-white border-none shadow-amber-200">Pitch Investors</Button>
+                     {pitchResult && <div className={`text-xs p-2 rounded ${pitchResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{pitchResult.message}</div>}
+                 </div>
+             </div>
+
+             <div className="p-4 border-t border-slate-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                 <Button onClick={() => onTurnSubmit({ rdFocus, marketingFocus, strategyNote, eventChoice: null })} disabled={isProcessing} isLoading={isProcessing} className="w-full py-4 text-sm shadow-blue-300/50 shadow-lg hover:scale-[1.02]">
+                     {activeEvent ? 'Resolve Event' : 'End Week'} <ArrowRight size={18}/>
+                 </Button>
+             </div>
+        </div>
+
+        {/* === BOTTOM NAV (Mobile Only) === */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-slate-200 px-4 pb-safe-bottom pt-2 flex justify-between z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+             <MobileNavItem id="overview" label="Home" icon={<LayoutDashboard/>}/>
+             <MobileNavItem id="products" label="Prod" icon={<Package/>}/>
+             <MobileNavItem id="contracts" label="Jobs" icon={<ScrollText/>}/>
+             <MobileNavItem id="team" label="Team" icon={<Users/>}/>
+             <MobileNavItem id="investment" label="Invest" icon={<Handshake/>}/>
+        </div>
+
+        {/* === MODALS (Chat, Candidate, Negotiation, Intel) === */}
+        {/* Chat Modal */}
+        {activeChatEmployee && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col h-[500px] animate-fadeIn">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <div className="font-bold text-slate-800 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div>{activeChatEmployee.name}</div>
+                        <button onClick={() => setChatEmployeeId(null)}><XCircle size={24} className="text-slate-400 hover:text-slate-600"/></button>
+                    </div>
+                    <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+                        {chatHistory.map((m, i) => (
+                            <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[80%] shadow-sm ${m.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'}`}>{m.text}</div>
+                            </div>
+                        ))}
+                        {isChatting && <div className="text-xs text-slate-400 italic ml-4">Typing...</div>}
+                    </div>
+                    <div className="p-3 border-t border-slate-200 flex gap-2 bg-white">
+                        <input className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={chatMessage} onChange={e => setChatMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Type a message..." />
+                        <button onClick={sendChat} className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors shadow-blue-200 shadow-md"><Send size={20}/></button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Candidate Modal */}
+        {selectedCandidate && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
+                 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-slideUp my-auto border border-slate-100">
+                     <div className="p-6 md:p-8">
+                         <div className="flex justify-between items-start mb-6">
+                             <div className="flex gap-4 items-center">
+                                 <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl font-bold border border-indigo-100">{selectedCandidate.name.charAt(0)}</div>
+                                 <div>
+                                     <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedCandidate.name}</h2>
+                                     <div className="text-slate-500 font-medium">{selectedCandidate.level} {selectedCandidate.role}</div>
+                                 </div>
+                             </div>
+                             <button onClick={() => setSelectedCandidate(null)} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100"><X size={20} className="text-slate-500"/></button>
+                         </div>
+                         <div className="space-y-6">
+                             <div className="prose prose-slate text-sm"><p className="italic border-l-4 border-indigo-300 pl-4 py-2 bg-indigo-50/50 rounded-r-lg text-slate-700">"{selectedCandidate.bio}"</p></div>
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Skill</div>
+                                     <div className="text-2xl font-bold text-slate-900">{selectedCandidate.skill}</div>
+                                 </div>
+                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Salary</div>
+                                     <div className="text-2xl font-bold text-slate-900">${selectedCandidate.salary}</div>
+                                 </div>
+                             </div>
+                             <div className="bg-amber-50 p-5 rounded-2xl border border-amber-100 text-sm text-amber-900 font-medium">
+                                 <div className="flex items-center gap-2 mb-2 text-amber-700 font-bold uppercase text-xs tracking-wider"><FileSearch size={14}/> Interview Notes</div>
+                                 {selectedCandidate.interviewNotes}
+                             </div>
+                             <div className="flex gap-4 pt-4 border-t border-slate-100">
+                                 <Button variant="secondary" onClick={() => setSelectedCandidate(null)} className="flex-1 py-3">Pass</Button>
+                                 <Button variant="success" onClick={handleHireFromModal} disabled={state.cash < selectedCandidate.hireCost} className="flex-1 py-3 shadow-emerald-200 shadow-lg">Hire Now (${selectedCandidate.hireCost})</Button>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        )}
+
+        {/* Negotiation Modal */}
+        {activeNegotiation && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden flex flex-col h-[600px] animate-fadeIn">
+                     <div className="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
+                         <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 rounded-full bg-amber-400 flex items-center justify-center font-bold text-slate-900 border-4 border-white/20 text-xl">{activeNegotiation.name.charAt(0)}</div>
+                             <div>
+                                 <div className="font-bold text-lg">{activeNegotiation.name}</div>
+                                 <div className="text-xs opacity-70 font-mono uppercase tracking-wide">{activeNegotiation.style} Investor</div>
+                             </div>
+                         </div>
+                         <button onClick={() => setActiveNegotiationId(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24}/></button>
+                     </div>
+                     <div className="bg-amber-50 p-4 border-b border-amber-100 flex justify-between items-center shrink-0">
+                         <div><div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Current Offer</div><div className="text-2xl font-bold text-emerald-600 font-heading">${activeNegotiation.offerAmount.toLocaleString()}</div></div>
+                         <div className="text-right"><div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Equity</div><div className="text-2xl font-bold text-slate-900 font-heading">{activeNegotiation.equityDemanded}%</div></div>
+                         <div className="text-right bg-white px-3 py-1.5 rounded-lg border border-amber-200 shadow-sm"><div className="text-[10px] font-bold text-slate-400 uppercase">Patience</div><div className="text-lg font-bold text-rose-600 leading-none">{activeNegotiation.patience}</div></div>
+                     </div>
+                     <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4">
+                         <div className="flex justify-start"><div className="bg-white border border-slate-200 p-5 rounded-2xl rounded-tl-none shadow-sm max-w-[90%] text-sm font-medium text-slate-700 leading-relaxed">"{activeNegotiation.lastResponse}"</div></div>
+                     </div>
+                     <div className="p-5 bg-white border-t border-slate-200 shrink-0">
+                         {activeNegotiation.status === 'negotiating' || activeNegotiation.status === 'new' ? (
+                             <div className="flex gap-3">
+                                 <input className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="E.g. I want $2M for 10%..." value={negotiationMessage} onChange={(e) => setNegotiationMessage(e.target.value)} />
+                                 <Button onClick={handleNegotiationSubmit} disabled={isProcessing || !negotiationMessage} className="px-5 shadow-lg shadow-blue-200"><Send size={18}/></Button>
+                             </div>
+                         ) : (
+                             <div className={`text-center font-bold p-4 rounded-xl ${activeNegotiation.status === 'partner' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{activeNegotiation.status === 'partner' ? "DEAL CLOSED" : "NEGOTIATION FAILED"}</div>
+                         )}
+                     </div>
+                 </div>
+            </div>
+        )}
+
+        {/* Event Modal */}
+        {activeEvent && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp ring-8 ring-black/5">
+                    <div className={`p-8 text-white relative overflow-hidden ${activeEvent.type === 'crisis' ? 'bg-rose-600' : activeEvent.type === 'opportunity' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="flex items-center gap-2 mb-3 font-bold uppercase tracking-widest text-xs opacity-90 relative z-10">
+                            {activeEvent.type === 'crisis' ? <AlertOctagon size={16}/> : <Sparkles size={16}/>} Priority Alert
+                        </div>
+                        <h2 className="text-3xl font-bold font-heading leading-tight relative z-10">{activeEvent.title}</h2>
+                    </div>
+                    <div className="p-8">
+                        <p className="text-slate-600 text-lg leading-relaxed mb-8 font-medium">{activeEvent.description}</p>
+                        <div className="space-y-3">
+                            {activeEvent.options?.map((opt, idx) => (
+                                <button key={idx} onClick={() => handleEventChoice(opt.label)} className="w-full text-left p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition-all group relative overflow-hidden">
+                                    <div className="flex justify-between items-center relative z-10">
+                                        <span className="font-bold text-slate-800 group-hover:text-blue-700">{opt.label}</span>
+                                        <span className="text-[10px] font-bold px-2 py-1 rounded bg-slate-200 text-slate-600 uppercase tracking-wide group-hover:bg-white">{opt.risk}</span>
+                                    </div>
+                                </button>
+                            ))}
+                            <button onClick={() => handleEventChoice("Ignore")} className="w-full text-center p-3 text-slate-400 hover:text-slate-600 text-sm font-bold transition-colors mt-4">Ignore & Continue</button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        )}
 
-        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0">
-            {/* Removed fundingRound from onTurnSubmit object to match PlayerDecisions interface */}
-            <Button 
-                onClick={() => onTurnSubmit({ rdFocus, marketingFocus, strategyNote, eventChoice: null })}
-                isLoading={isProcessing}
-                disabled={activeEvent !== null}
-                className="w-full py-4 text-lg font-bold shadow-blue-300/50 hover:shadow-blue-400/50 disabled:opacity-50 disabled:shadow-none"
-            >
-                {activeEvent ? "Resolve Alert First" : "End Week"}
-            </Button>
-            <div className="flex justify-between items-center mt-3 px-1">
-                <span className="text-xs text-slate-400 font-mono">Week {state.turn}</span>
-                <span className="text-xs text-green-600 font-mono font-bold">${state.cash.toLocaleString()} Available</span>
-            </div>
-        </div>
-      </div>
+        {/* Intel Modal */}
+        {currentIntel.length > 0 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fadeIn">
+              <div className="w-full max-w-lg bg-[#fcfbf7] rounded shadow-2xl overflow-hidden border-8 border-slate-200 relative transform rotate-1">
+                   <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/aged-paper.png")'}}></div>
+                   <div className="absolute top-6 right-6 border-4 border-red-600/20 text-red-600/20 font-black text-5xl p-2 rounded-lg transform rotate-12 pointer-events-none uppercase">Confidential</div>
+                   <div className="p-8 relative z-10">
+                       <div className="border-b-2 border-slate-800 pb-4 mb-6 flex justify-between items-end">
+                           <div>
+                               <div className="flex items-center gap-2 text-xs font-bold bg-slate-900 text-white px-2 py-1 mb-2 w-fit uppercase tracking-widest">Top Secret</div>
+                               <h2 className="text-3xl font-bold text-slate-900 font-heading uppercase tracking-tighter leading-none">Intel Report</h2>
+                               <p className="text-xs font-mono text-slate-500 uppercase mt-2">Source: {currentIntel[0].source || "Unknown"} // Reliability: {currentIntel[0].reliability}%</p>
+                           </div>
+                       </div>
+                       <div className="prose prose-slate max-w-none font-serif text-lg leading-relaxed text-slate-800 mb-8 pl-4 border-l-4 border-slate-300">
+                           <p>{currentIntel[0].content}</p>
+                       </div>
+                       <div className="pt-6 border-t border-slate-300 flex justify-between items-center">
+                           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase"><FileLock size={14}/> Eyes Only</div>
+                           <Button onClick={() => onDismissIntel(currentIntel[0].id)} className="bg-slate-900 text-white hover:bg-slate-800 rounded-none px-8 font-mono uppercase tracking-widest text-xs">Burn After Reading</Button>
+                       </div>
+                   </div>
+              </div>
+          </div>
+        )}
+
     </div>
   );
 };
-
-export default GameDashboard;
