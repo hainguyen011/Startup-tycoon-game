@@ -14,6 +14,7 @@ const GameContainer: React.FC = () => {
   
   const [gameState, setGameState] = useState<GameState>({
     companyName: '',
+    ceo: { name: '', gender: 'Male', interests: [] },
     industry: Industry.TECH,
     cash: INITIAL_CASH,
     users: 0,
@@ -44,6 +45,7 @@ const GameContainer: React.FC = () => {
       industry: Industry, 
       productName: string, 
       productDesc: string, 
+      ceo: { name: string, gender: 'Male' | 'Female' | 'Other', interests: string[] },
       userApiKey?: string,
       provider: LLMProvider = 'gemini'
     ) => {
@@ -70,9 +72,9 @@ const GameContainer: React.FC = () => {
     setLoading(true);
     try {
       // Initialize story with explicit overrides to ensure they are used immediately
-      const initData = await initializeGameStory(industry, name, productName, productDesc, language, userApiKey, provider);
+      const initData = await initializeGameStory(industry, name, productName, productDesc, ceo, language, { apiKey: userApiKey, provider });
       
-      // Create initial product
+      // Create initial product with modules
       const initialProduct: Product = {
           id: `prod-${Date.now()}`,
           name: productName,
@@ -80,8 +82,14 @@ const GameContainer: React.FC = () => {
           stage: ProductStage.CONCEPT,
           developmentProgress: 0,
           quality: 50,
-          marketFit: 50, // Average start
+          marketFit: 50, 
           bugs: 0,
+          techDebt: 0,
+          modules: [
+              { id: 'm1', name: t('dashboard.products.modules.core'), requiredSkill: 'Backend', progress: 0, quality: 50, assignedEmployeeId: null },
+              { id: 'm2', name: t('dashboard.products.modules.ui'), requiredSkill: 'Frontend', progress: 0, quality: 50, assignedEmployeeId: null },
+              { id: 'm3', name: t('dashboard.products.modules.db'), requiredSkill: 'Database', progress: 0, quality: 50, assignedEmployeeId: null }
+          ],
           users: 0,
           revenue: 0,
           activeFeedback: [initData.initialProductAnalysis]
@@ -90,6 +98,7 @@ const GameContainer: React.FC = () => {
       setGameState(prev => ({
         ...prev,
         companyName: name,
+        ceo: ceo,
         industry: industry,
         stage: GameStage.PLAYING,
         marketContext: initData.marketContext,
@@ -257,9 +266,38 @@ const GameContainer: React.FC = () => {
                       };
                   }
                   return e;
+              }),
+              // Also clear module assignment if unassigning from product
+              products: prev.products.map(p => {
+                  if (p.id !== targetId) {
+                      return {
+                          ...p,
+                          modules: p.modules.map(m => m.assignedEmployeeId === empId ? { ...m, assignedEmployeeId: null } : m)
+                      };
+                  }
+                  return p;
               })
           };
       });
+  };
+
+  const handleAssignToModule = (empId: string, productId: string, moduleId: string | null) => {
+      setGameState(prev => ({
+          ...prev,
+          products: prev.products.map(p => {
+              if (p.id === productId) {
+                  return {
+                      ...p,
+                      modules: p.modules.map(m => {
+                          if (m.id === moduleId) return { ...m, assignedEmployeeId: empId };
+                          if (m.assignedEmployeeId === empId) return { ...m, assignedEmployeeId: null };
+                          return m;
+                      })
+                  };
+              }
+              return p;
+          })
+      }));
   };
 
   const handleCreateProduct = (name: string, desc: string) => {
@@ -272,6 +310,12 @@ const GameContainer: React.FC = () => {
           quality: 50,
           marketFit: 50,
           bugs: 0,
+          techDebt: 0,
+          modules: [
+              { id: `m1-${Date.now()}`, name: 'Core Engine', requiredSkill: 'Backend', progress: 0, quality: 50, assignedEmployeeId: null },
+              { id: `m2-${Date.now()}`, name: 'User Interface', requiredSkill: 'Frontend', progress: 0, quality: 50, assignedEmployeeId: null },
+              { id: `m3-${Date.now()}`, name: 'Database Schema', requiredSkill: 'Database', progress: 0, quality: 50, assignedEmployeeId: null }
+          ],
           users: 0,
           revenue: 0,
           activeFeedback: []
@@ -476,8 +520,13 @@ const GameContainer: React.FC = () => {
       const salaryBurn = gameState.employees.reduce((acc, emp) => acc + emp.salary, 0);
       const facilityBurn = gameState.facilities.reduce((acc, fac) => acc + fac.maintenanceCost, 0);
       
+      // Welfare Multiplier
+      let welfareCostMultiplier = 1;
+      if (decisions.welfareLevel === 'Premium') welfareCostMultiplier = 2;
+      if (decisions.welfareLevel === 'Minimal') welfareCostMultiplier = 0.5;
+
       const marketingCost = MARKETING_COSTS[decisions.marketingFocus] || 0;
-      const weeklyFixedExpenses = Math.round((salaryBurn + facilityBurn) / 4);
+      const weeklyFixedExpenses = Math.round((salaryBurn + (facilityBurn * welfareCostMultiplier)) / 4);
       const totalTurnExpenses = weeklyFixedExpenses + marketingCost;
 
       // 1. Process Contract Logic (Local Calculation for Reliability)
@@ -566,12 +615,21 @@ const GameContainer: React.FC = () => {
 
             const newFeedback = update.newFeedback ? [update.newFeedback, ...prod.activeFeedback].slice(0, 5) : prod.activeFeedback;
 
+            // Updated Module progress
+            const updatedModules = prod.modules.map(mod => {
+                const modUpdate = update.moduleUpdates?.find(mu => mu.moduleId === mod.id);
+                if (!modUpdate) return mod;
+                return { ...mod, progress: Math.min(100, mod.progress + modUpdate.progressChange) };
+            });
+
             return {
                 ...prod,
                 stage: newStage,
                 developmentProgress: newProgress,
                 quality: Math.min(100, Math.max(0, prod.quality + update.qualityChange)),
                 bugs: Math.max(0, prod.bugs + update.bugChange),
+                techDebt: Math.min(100, Math.max(0, prod.techDebt + update.techDebtChange)),
+                modules: updatedModules,
                 users: Math.max(0, prod.users + update.userChange),
                 revenue: Math.max(0, prod.revenue + update.revenueChange),
                 activeFeedback: newFeedback
@@ -659,6 +717,7 @@ const GameContainer: React.FC = () => {
                 onEventDecision={handleEventDecision}
                 onChatWithEmployee={handleChatWithEmployee}
                 onAssignEmployee={handleAssignEmployee}
+                onAssignToModule={handleAssignToModule}
                 onCreateProduct={handleCreateProduct}
                 onPitch={handlePitchInvestors}
                 onFindContracts={handleFindContracts}

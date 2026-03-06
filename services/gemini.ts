@@ -1,17 +1,39 @@
 
 import { GoogleGenAI, Type, Schema, GenerateContentResponse } from "@google/genai";
-import { GameState, Industry, PlayerDecisions, SimulationResult, IntelType, Employee, Candidate, Product, ProductStage, Language, LLMProvider, MARKETING_COSTS, Contract, Investor } from "../types";
+import { Language, Industry, GameState, CEODetails, SimulationResult, Employee, Candidate, Product, Contract, Investor, LLMProvider, IntelType, PlayerDecisions, WelfareLevel, WorkMode, MARKETING_COSTS, InitialGameStoryResponse as InitGameResponse } from "../types";
 
 // Configuration State
 let currentProvider: LLMProvider = 'gemini';
-let dynamicApiKey = '';
+const STORAGE_KEY = 'startup_tycoon_api_key';
+
+const getSavedApiKey = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+let dynamicApiKey = getSavedApiKey();
 
 // --- CONFIGURATION METHODS ---
 
 export const setLLMConfig = (apiKey: string, provider: LLMProvider = 'gemini') => {
   dynamicApiKey = apiKey.trim();
   currentProvider = provider;
+  if (dynamicApiKey) {
+    try {
+      localStorage.setItem(STORAGE_KEY, dynamicApiKey);
+    } catch (e) {
+      console.error("Failed to save API key to localStorage", e);
+    }
+  }
 };
+
+export const getLLMConfig = () => ({
+  apiKey: dynamicApiKey,
+  provider: currentProvider
+});
 
 export const hasValidApiKey = () => !!dynamicApiKey && dynamicApiKey.length > 0;
 
@@ -103,9 +125,10 @@ async function generateContentJSON<T>(request: LLMRequest): Promise<T> {
 
 // --- Helper to get system instruction based on language ---
 const getSystemInstruction = (lang: Language) => {
-  return lang === 'vi' 
-    ? "Bạn là engine mô phỏng kinh doanh Startup. Hãy trả lời BẰNG TIẾNG VIỆT." 
-    : "You are a Startup Business Simulation Engine. Respond IN ENGLISH.";
+  const isVi = lang === 'vi';
+  return isVi 
+    ? "Bạn là engine mô phỏng kinh doanh Startup chuyên sâu. BẮT BUỘC trả lời hoàn toàn bằng TIẾNG VIỆT. Tuyệt đối không pha trộn tiếng Anh trừ các thuật ngữ kỹ thuật không thể dịch. Phản hồi phải chuyên nghiệp, súc tích và mang tính chiến lược." 
+    : "You are an advanced Startup Business Simulation Engine. You MUST respond entirely in ENGLISH. Do not use any other language. Feedback should be professional, concise, and strategic.";
 };
 
 // --- RETRY LOGIC (Generic) ---
@@ -149,27 +172,24 @@ async function callAIWithRetry<T>(
 
 // --- Initialization ---
 
-interface InitGameResponse {
-  marketContext: string;
-  competitorName: string;
-  initialFeedback: string;
-  initialProductAnalysis: string;
-}
+// Interface moved to types.ts
 
 export const initializeGameStory = async (
     industry: Industry, 
     companyName: string, 
     productName: string, 
     productDesc: string, 
+    ceo: CEODetails,
     language: Language, 
-    apiKeyOverride?: string,
-    providerOverride?: LLMProvider
+    config: { apiKey?: string, provider?: LLMProvider } = {}
 ): Promise<InitGameResponse> => {
   
-  if (apiKeyOverride && apiKeyOverride.trim().length > 0) {
-      setLLMConfig(apiKeyOverride, providerOverride || 'gemini');
-  } else if (providerOverride) {
-      currentProvider = providerOverride;
+  const { apiKey, provider = 'gemini' } = config;
+  
+  if (apiKey && apiKey.trim().length > 0) {
+      setLLMConfig(apiKey, provider);
+  } else {
+      currentProvider = provider;
   }
 
   const systemPrompt = getSystemInstruction(language);
@@ -178,6 +198,7 @@ export const initializeGameStory = async (
     Startup: "${companyName}" (${industry}).
     Product: "${productName}".
     Description: "${productDesc}".
+    CEO Profile: ${ceo.name} (${ceo.gender}). Interests: ${ceo.interests.join(', ')}.
     
     Generate market context for 2024-2025.
     
@@ -188,6 +209,8 @@ export const initializeGameStory = async (
       "initialFeedback": "Advice for CEO",
       "initialProductAnalysis": "Short product market fit analysis"
     }
+    
+    IMPORTANT: All text fields must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}.
   `;
 
   try {
@@ -579,24 +602,34 @@ export const processTurn = async (
   const prompt = `
     Week ${gameState.turn}. Stage: ${gameState.stage}.
     
-    PRODUCTS:
-    ${JSON.stringify(productsContext, null, 2)}
+    PRODUCTS & MODULES:
+    ${gameState.products.map(p => `
+      Product: ${p.name} (${p.stage})
+      Stats: Quality ${p.quality}, Bugs ${p.bugs}, TechDebt ${p.techDebt}/100
+      Modules: ${p.modules.map(m => `- ${m.name} (Req: ${m.requiredSkill}, Progress: ${m.progress}%, Assigned: ${m.assignedEmployeeId || 'None'})`).join('\n')}
+      Assigned Team: ${gameState.employees.filter(e => e.assignedProductId === p.id).map(e => `${e.name} (${e.role}, Skill ${e.skill}, Specific: ${e.specificSkills.join(', ')})`).join(', ')}
+    `).join('\n')}
     
-    Mkt Focus: ${decisions.marketingFocus} (Cost: $${marketingCost})
-    R&D Focus: ${decisions.rdFocus}
-    Strategy Note: ${decisions.strategyNote}
-    Event Choice: ${decisions.eventChoice}
+    MANAGEMENT DECISIONS:
+    - Work Mode: ${decisions.workMode} (Standard/Crunch/Leisure)
+    - Welfare Level: ${decisions.welfareLevel} (Minimal/Standard/Premium)
+    - Mkt Focus: ${decisions.marketingFocus} (Cost: $${marketingCost})
+    - R&D Focus: ${decisions.rdFocus}
+    - Strategy Note: ${decisions.strategyNote}
     
-    SIMULATION LOGIC:
-    1. TeamPower -> Progress.
-    2. Stage Transitions (Concept -> MVP -> Alpha -> Release).
-    3. Quality/Bugs -> Feedback.
-    4. CALCULATE CASH CHANGE:
-       - DO NOT subtract Marketing Costs ($${marketingCost}) or Burn Rate ($${burnRate}). The system handles this.
-       - ONLY return the GROSS INCOME generated this week (Sales Revenue + Cash from Events).
-       - If no revenue and no events, return 0.
+    SIMULATION RULES:
+    1. PROGRESS: Progress on modules depends on MATCH between employee's specificSkills and module's requiredSkill. 
+       - Mismatch = 50% penalty. 
+       - Crunch Mode = +50% progress but +10 Tech Debt and high Stress.
+       - Leisure Mode = -30% progress but -10 Stress and +Skill XP.
+    2. TECH DEBT: Accumulates if progress is too fast or team is unskilled. High Tech Debt ( > 60) reduces weekly progress and quality.
+    3. REVENUE: Decreases as Tech Debt increases. Unfixed bugs also hurt user growth.
+    4. STRESS & MORALE: Welfare Level affects Stress recovery. 
     
-    Output JSON.
+    OUTPUT: Calculate changes carefully based on these complex interactions.
+    Return JSON.
+    
+    CRITICAL: All narrative and report text must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}. Do not mix languages.
   `;
 
   const schema = {
@@ -615,11 +648,23 @@ export const processTurn = async (
                     devProgressChange: { type: Type.INTEGER },
                     qualityChange: { type: Type.INTEGER },
                     bugChange: { type: Type.INTEGER },
+                    techDebtChange: { type: Type.INTEGER }, // New
                     userChange: { type: Type.INTEGER },
                     revenueChange: { type: Type.INTEGER },
+                    moduleUpdates: { // New
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                moduleId: { type: Type.STRING },
+                                progressChange: { type: Type.INTEGER }
+                            },
+                            required: ["moduleId", "progressChange"]
+                        }
+                    },
                     newFeedback: { type: Type.STRING, nullable: true }
                 },
-                required: ["productId", "devProgressChange", "qualityChange", "bugChange", "userChange", "revenueChange"]
+                required: ["productId", "devProgressChange", "qualityChange", "bugChange", "techDebtChange", "userChange", "revenueChange"]
             }
         },
         secretaryReport: { type: Type.STRING, nullable: true },

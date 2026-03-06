@@ -83,24 +83,37 @@ export enum ProductStage {
   MATURE = 'Mature' // Needs Maintenance
 }
 
+export interface ProductModule {
+  id: string;
+  name: string;
+  requiredSkill: string;
+  progress: number;
+  quality: number;
+  assignedEmployeeId: string | null;
+}
+
 export interface Product {
   id: string;
   name: string;
   description: string;
   stage: ProductStage;
   
-  // Progress Bars (0-100)
+  // Progress & Quality
   developmentProgress: number; 
+  quality: number; 
+  marketFit: number; 
+  bugs: number;
+  techDebt: number; // New: 0-100 scale
+  
+  // Modules (New)
+  modules: ProductModule[];
   
   // Metrics
-  quality: number; // 0-100
-  marketFit: number; // 0-100 (Hidden potential)
-  bugs: number; // Count
   users: number;
-  revenue: number; // Monthly
+  revenue: number;
   
   // Feedback
-  activeFeedback: string[]; // List of user complaints/praises
+  activeFeedback: string[]; 
 }
 
 // --- CONTRACTS SYSTEM ---
@@ -156,6 +169,13 @@ export interface PlayerSkills {
   charisma: number; 
 }
 
+export interface CEODetails {
+  name: string;
+  gender: 'Male' | 'Female' | 'Other';
+  interests: string[];
+  background?: string;
+}
+
 // --- EVENT SYSTEM ---
 
 export interface EventOption {
@@ -172,11 +192,25 @@ export interface InteractiveEvent {
 
 // ----------------------------------------
 
+export enum WorkMode {
+  CRUNCH = 'Crunch Mode',
+  STANDARD = 'Standard',
+  LEISURE = 'Leisure/Learning'
+}
+
+export enum WelfareLevel {
+  MINIMAL = 'Minimal',
+  STANDARD = 'Standard',
+  PREMIUM = 'Premium'
+}
+
 export interface PlayerDecisions {
   rdFocus: string; 
   marketingFocus: string; 
   strategyNote: string; 
   eventChoice: string | null; 
+  workMode: WorkMode; // New
+  welfareLevel: WelfareLevel; // New
 }
 
 export interface SimulationResult {
@@ -202,8 +236,13 @@ export interface SimulationResult {
       devProgressChange: number;
       qualityChange: number;
       bugChange: number;
+      techDebtChange: number; // New
       userChange: number;
       revenueChange: number;
+      moduleUpdates?: { // New
+          moduleId: string;
+          progressChange: number;
+      }[];
       newFeedback?: string;
   }[];
 
@@ -217,6 +256,7 @@ export interface SimulationResult {
 
 export interface GameState {
   companyName: string;
+  ceo: CEODetails;
   industry: Industry;
   cash: number;
   users: number; // Total across all products
@@ -240,6 +280,13 @@ export interface GameState {
   marketContext: string; 
   competitorName: string;
   gameOverReason?: string;
+}
+
+export interface InitialGameStoryResponse {
+  marketContext: string;
+  competitorName: string;
+  initialFeedback: string;
+  initialProductAnalysis: string;
 }
 
 export const INITIAL_CASH = 10000;

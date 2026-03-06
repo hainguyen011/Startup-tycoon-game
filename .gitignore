@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Agent Metadata
+.gemini
+.aevum
+.agents
+_agents
+brain
+
+# Environment
+.env
+.env.*
+!.env.example

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, GameStage, PlayerDecisions, Industry, SimulationResult, IntelType, IntelItem, Employee, Facility, Candidate, InteractiveEvent, Product, ProductStage, MARKETING_COSTS, Contract } from '../types';
+import { GameState, GameStage, Industry, PlayerDecisions, INITIAL_CASH, SimulationResult, IntelType, IntelItem, INITIAL_FACILITIES, INITIAL_SKILLS, Employee, Candidate, Product, ProductStage, LLMProvider, MARKETING_COSTS, Contract, Investor, WorkMode, WelfareLevel, InteractiveEvent } from '../types';
 import StatCard from './StatCard';
 import Button from './Button';
 import { DollarSign, Users, TrendingUp, Zap, Activity, PieChart, Send, AlertTriangle, ShieldAlert, Lock, Search, Eye, FileText, BrainCircuit, Landmark, Briefcase, Server, User, UserPlus, XCircle, ChevronUp, Sparkles, Smile, Frown, CheckCircle, Tag, Trophy, Target, ClipboardList, Bell, AlertOctagon, HelpCircle, GraduationCap, History, FileSearch, Quote, Coffee, MessageSquare, Heart, BatteryWarning, MessageCircle, Loader2, Package, Plus, Bug, Gem, Megaphone, TrendingDown, Wallet, CreditCard, BarChart3, Menu, X, FileLock, Radio, Signal, ArrowRight, Laptop, HandCoins, ScrollText, Handshake, LayoutDashboard, Building2, Briefcase as BriefcaseIcon, Settings2, Rocket } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { useLanguage } from '../LanguageContext';
+import { DirectiveSelector } from './DirectiveSelector';
 
 interface GameDashboardProps {
   state: GameState;
@@ -21,6 +22,7 @@ interface GameDashboardProps {
   onEventDecision: (decision: string) => void;
   onChatWithEmployee?: (empId: string, message: string) => Promise<string>;
   onAssignEmployee: (empId: string, targetId: string | null) => void;
+  onAssignToModule: (empId: string, productId: string, moduleId: string | null) => void;
   onCreateProduct: (name: string, desc: string) => void;
   onPitch: (round: string) => Promise<{success: boolean, message: string}>;
   onFindContracts: () => void;
@@ -31,12 +33,15 @@ interface GameDashboardProps {
 }
 
 export const GameDashboard: React.FC<GameDashboardProps> = ({ 
-    state, currentIntel, onTurnSubmit, onBuyIntel, onDismissIntel, onRecruit, onHireCandidate, onFire, onUpgradeFacility, isProcessing, onRestart, onEventDecision, onChatWithEmployee, onAssignEmployee, onCreateProduct, onPitch, onFindContracts, onAcceptContract, onFindInvestor, onNegotiate, onAskAdvice
+    state, currentIntel, onTurnSubmit, onBuyIntel, onDismissIntel, onRecruit, onHireCandidate, onFire, onUpgradeFacility, isProcessing, onRestart, onEventDecision, onChatWithEmployee,    onAssignEmployee,
+    onAssignToModule,
+    onCreateProduct,
+ onPitch, onFindContracts, onAcceptContract, onFindInvestor, onNegotiate, onAskAdvice
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'contracts' | 'investment' | 'team' | 'infra' | 'report'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'contracts' | 'investment' | 'team' | 'infra' | 'report' | 'founder'>('overview');
   
   // Mobile UI State
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -44,9 +49,11 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
   // Sub-states
   const [hrSubTab, setHrSubTab] = useState<'manage' | 'recruit'>('manage');
   const [rdFocus, setRdFocus] = useState('Nâng cấp tính năng cốt lõi');
-  const [marketingFocus, setMarketingFocus] = useState('Chạy quảng cáo Facebook/Google');
+  const [marketingFocus, setMarketingFocus] = useState('Không làm gì / Tạm dừng');
   const [fundingRound, setFundingRound] = useState('Seed Round ($200k)');
   const [strategyNote, setStrategyNote] = useState('');
+  const [workMode, setWorkMode] = useState<WorkMode>(WorkMode.STANDARD);
+  const [welfareLevel, setWelfareLevel] = useState<WelfareLevel>(WelfareLevel.STANDARD);
   
   // Modals & Popups State
   const [activeEvent, setActiveEvent] = useState<InteractiveEvent | null>(null);
@@ -131,7 +138,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
             <div className="mb-6 inline-flex p-6 bg-slate-50 rounded-full shadow-inner">
                 {state.stage === GameStage.VICTORY ? <Trophy size={60} className="text-yellow-500" /> : <AlertTriangle size={60} className="text-rose-500" />}
             </div>
-            <h2 className="text-4xl font-extrabold text-slate-900 mb-4 font-heading">{state.stage === GameStage.VICTORY ? t('gameover.victory') : t('gameover.title')}</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-4 font-heading">{t('gameover.victory')}</h2>
             <p className="text-slate-600 mb-8 text-lg">{state.stage === GameStage.VICTORY ? `Congrats! ${state.companyName} is now a Unicorn!` : `${state.gameOverReason || t('gameover.reason')}`}</p>
             <div className="grid grid-cols-2 gap-4 mb-8">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200"><div className="text-xs text-slate-500 uppercase font-bold">Final Users</div><div className="text-2xl font-bold text-slate-900">{state.users.toLocaleString()}</div></div>
@@ -169,6 +176,8 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
           <span className="text-[10px] font-bold mt-1">{label}</span>
       </button>
   );
+
+
 
   return (
     <div className="fixed inset-0 bg-[#f1f5f9] flex flex-col md:flex-row overflow-hidden text-slate-900 font-sans">
@@ -235,6 +244,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
             <div className="h-px bg-slate-100 my-3 mx-4"></div>
             <div className="text-xs font-bold text-slate-400 px-4 py-2 uppercase tracking-wider mb-1">Administration</div>
             <SidebarItem id="team" label={t('dashboard.tabs.team')} icon={<Users/>} />
+            <SidebarItem id="founder" label={t('dashboard.tabs.founder')} icon={<User/>} />
             <SidebarItem id="infra" label={t('dashboard.tabs.infra')} icon={<Server/>} />
             <SidebarItem id="report" label={t('dashboard.tabs.report')} icon={<ClipboardList/>} />
             
@@ -369,7 +379,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                                          <div className="pl-4 grid grid-cols-1 md:grid-cols-3 gap-6">
                                              <div className="col-span-1 md:col-span-1">
                                                  <div className="flex justify-between text-xs font-bold text-slate-500 mb-2"><span>Dev Progress</span><span>{p.developmentProgress}%</span></div>
-                                                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200"><div className="h-full bg-blue-500 transition-all duration-700" style={{width: `${p.developmentProgress}%`}}></div></div>
+                                                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 transition-all duration-700" style={{width: `${p.developmentProgress}%`}}></div></div>
                                              </div>
                                              <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
                                                  <div className="text-xs font-bold text-slate-500 uppercase">Users</div>
@@ -378,6 +388,44 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                                              <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
                                                  <div className="text-xs font-bold text-slate-500 uppercase">Quality</div>
                                                  <div className={`font-bold text-lg ${p.quality > 80 ? 'text-emerald-600' : 'text-slate-800'}`}>{p.quality}/100</div>
+                                             </div>
+                                             <div className="flex justify-between items-center bg-rose-50 px-4 py-3 rounded-xl border border-rose-100">
+                                                 <div className="text-xs font-bold text-rose-500 uppercase flex items-center gap-1"><ShieldAlert size={14}/> {t('dashboard.products.techDebt')}</div>
+                                                 <div className={`font-bold text-lg ${p.techDebt > 60 ? 'text-rose-600' : 'text-slate-800'}`}>{p.techDebt}%</div>
+                                             </div>
+                                         </div>
+
+                                         <div className="mt-8 pt-6 border-t border-slate-100">
+                                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                 <Package size={16} className="text-blue-500"/> {t('dashboard.products.modulesTitle')}
+                                             </h4>
+                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                 {p.modules.map(mod => {
+                                                     const assignedEmp = state.employees.find(e => e.id === mod.assignedEmployeeId);
+                                                     return (
+                                                         <div key={mod.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 relative overflow-hidden">
+                                                             <div className="flex justify-between items-start mb-2">
+                                                                 <div className="font-bold text-sm text-slate-800">{mod.name}</div>
+                                                                 <div className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded uppercase">{mod.requiredSkill}</div>
+                                                             </div>
+                                                             <div className="mb-3">
+                                                                 <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1"><span>Progress</span><span>{mod.progress}%</span></div>
+                                                                 <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${mod.progress}%`}}></div></div>
+                                                             </div>
+                                                             
+                                                             <select 
+                                                                 className="w-full text-[10px] bg-white border border-slate-200 rounded-lg p-1.5 font-bold text-slate-700 outline-none"
+                                                                 onChange={(e) => onAssignToModule(e.target.value, p.id, mod.id)}
+                                                                 value={mod.assignedEmployeeId || ""}
+                                                             >
+                                                                 <option value="">Unassigned</option>
+                                                                 {state.employees.filter(e => e.assignedProductId === p.id).map(e => (
+                                                                     <option key={e.id} value={e.id}>{e.name} ({e.skill})</option>
+                                                                 ))}
+                                                             </select>
+                                                         </div>
+                                                     );
+                                                 })}
                                              </div>
                                          </div>
                                      </div>
@@ -463,7 +511,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                                       </div>
                                       <div className="flex gap-3">
                                           <Button onClick={onAskAdvice} className="bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur-md">Board Advice</Button>
-                                          <Button onClick={onFindInvestor} className="bg-white text-slate-900 hover:bg-slate-100 border-none shadow-lg">Find Investors</Button>
+                                          <Button onClick={onFindInvestor} className="bg-white text-black hover:bg-slate-100 border-none shadow-lg">Find Investors</Button>
                                       </div>
                                   </div>
                               </div>
@@ -570,6 +618,80 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                          </div>
                      )}
 
+                     {/* FOUNDER TAB */}
+                     {activeTab === 'founder' && (
+                         <div className="animate-fadeIn space-y-8">
+                              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row">
+                                  <div className="w-full md:w-1/3 bg-slate-50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
+                                      <div className="w-40 h-40 rounded-full bg-white shadow-xl border-4 border-white overflow-hidden flex items-center justify-center mb-6 relative group">
+                                          <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                              <Sparkles className="text-blue-600" size={32}/>
+                                          </div>
+                                          {state.ceo.gender === 'Female' ? (
+                                              <div className="w-full h-full bg-pink-100 flex items-center justify-center text-pink-500">
+                                                  <User size={80}/>
+                                              </div>
+                                          ) : (
+                                              <div className="w-full h-full bg-blue-100 flex items-center justify-center text-blue-500">
+                                                  <User size={80}/>
+                                              </div>
+                                          )}
+                                      </div>
+                                      <h2 className="text-2xl font-bold text-slate-900 mb-1">{state.ceo.name}</h2>
+                                      <div className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest mb-4">Chief Executive Officer</div>
+                                      
+                                      <div className="flex gap-2 mt-2">
+                                          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"><TrendingUp size={18}/></div>
+                                          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer"><Zap size={18}/></div>
+                                          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400 hover:text-purple-500 transition-colors cursor-pointer"><Heart size={18}/></div>
+                                      </div>
+                                  </div>
+
+                                  <div className="flex-1 p-8 md:p-10 space-y-8">
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                           <div className="space-y-1">
+                                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Management</div>
+                                               <div className="text-2xl font-bold text-slate-900">{state.playerSkills.management} <span className="text-sm font-medium text-slate-400">/ 100</span></div>
+                                               <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="bg-blue-600 h-full" style={{width: `${state.playerSkills.management}%`}}></div></div>
+                                           </div>
+                                           <div className="space-y-1">
+                                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Technical</div>
+                                               <div className="text-2xl font-bold text-slate-900">{state.playerSkills.tech} <span className="text-sm font-medium text-slate-400">/ 100</span></div>
+                                               <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="bg-indigo-600 h-full" style={{width: `${state.playerSkills.tech}%`}}></div></div>
+                                           </div>
+                                           <div className="space-y-1">
+                                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charisma</div>
+                                               <div className="text-2xl font-bold text-slate-900">{state.playerSkills.charisma} <span className="text-sm font-medium text-slate-400">/ 100</span></div>
+                                               <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="bg-purple-600 h-full" style={{width: `${state.playerSkills.charisma}%`}}></div></div>
+                                           </div>
+                                      </div>
+
+                                      <div className="space-y-4">
+                                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Heart size={14} className="text-rose-500"/> Personal Interests</h3>
+                                          <div className="flex flex-wrap gap-2">
+                                              {state.ceo.interests.map(interest => (
+                                                  <span key={interest} className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-2xl border border-slate-200">
+                                                      #{interest}
+                                                  </span>
+                                              ))}
+                                              {state.ceo.interests.length === 0 && <span className="text-slate-400 italic text-sm">No interests listed</span>}
+                                          </div>
+                                      </div>
+
+                                      <div className="space-y-4 pt-4 border-t border-slate-100">
+                                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Founder Narrative</h4>
+                                           <p className="text-slate-600 leading-relaxed text-sm italic">
+                                               {language === 'vi' 
+                                                 ? `Là người sáng lập ${state.companyName}, ${state.ceo.name} mang theo tầm nhìn thay đổi ngành ${state.industry}. Với đam mê dành cho ${state.ceo.interests.slice(0, 2).join(' và ')}, mục tiêu là xây dựng một đế chế kỳ lân bền vững.`
+                                                 : `As the founder of ${state.companyName}, ${state.ceo.name} brings a vision to disrupt the ${state.industry} industry. With a passion for ${state.ceo.interests.slice(0, 2).join(' and ')}, the goal is to build a sustainable unicorn empire.`
+                                               }
+                                           </p>
+                                      </div>
+                                  </div>
+                              </div>
+                         </div>
+                     )}
+
                      {/* INFRA TAB */}
                      {activeTab === 'infra' && (
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
@@ -620,12 +742,12 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
         </div>
 
         {/* === RIGHT SIDEBAR (Command Center - Desktop) / DRAWER (Mobile) === */}
-        <div className={`fixed inset-y-0 right-0 w-full md:w-80 bg-white border-l border-slate-200 transform transition-transform duration-300 z-40 flex flex-col shadow-2xl md:shadow-none
-            ${isCommandOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+        <div className={`fixed inset-y-0 right-0 w-full z-40 md:relative md:inset-auto md:z-10 md:translate-x-0 md:w-80 bg-white border-l border-slate-200 transform transition-transform duration-300 flex flex-col shadow-2xl md:shadow-none
+            ${isCommandOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 backdrop-blur-md h-16">
                  <div className="flex items-center gap-2 font-bold text-slate-800 text-lg">
-                     <BrainCircuit className="text-blue-600"/> Command Center
+                     <BrainCircuit className="text-blue-600"/> {t('dashboard.command.title')}
                  </div>
                  <button onClick={() => setIsCommandOpen(false)} className="md:hidden p-2 rounded-full hover:bg-slate-200"><X size={24}/></button>
              </div>
@@ -634,46 +756,103 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                  
                  {/* Intel Section */}
                  <div className="space-y-3">
-                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Intelligence</h4>
+                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('dashboard.command.intel')}</h4>
                      <div className="grid grid-cols-1 gap-3">
                          <button onClick={() => onBuyIntel(IntelType.MARKET, 500)} disabled={state.cash < 500} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left disabled:opacity-50">
                              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><TrendingUp size={18}/></div>
-                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">Market Research</div><div className="text-xs text-slate-500 font-mono">$500</div></div>
+                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">{t('dashboard.intel.market')}</div><div className="text-xs text-slate-500 font-mono">$500</div></div>
                          </button>
                          <button onClick={() => onBuyIntel(IntelType.COMPETITOR, 1200)} disabled={state.cash < 1200} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all text-left disabled:opacity-50">
                              <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Eye size={18}/></div>
-                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">Competitor Spy</div><div className="text-xs text-slate-500 font-mono">$1200</div></div>
+                             <div className="flex-1"><div className="text-sm font-bold text-slate-800">{t('dashboard.intel.competitor')}</div><div className="text-xs text-slate-500 font-mono">$1200</div></div>
                          </button>
                      </div>
                  </div>
 
                  {/* Strategy Section */}
-                 <div className="space-y-4">
-                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Directives</h4>
-                     
-                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1"><Settings2 size={12}/> R&D Priority</label>
-                         <select value={rdFocus} onChange={e => setRdFocus(e.target.value)} className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                             <option>Nâng cấp tính năng cốt lõi</option>
-                             <option>Sửa lỗi & Ổn định hệ thống</option>
-                             <option>Nghiên cứu công nghệ mới (AI)</option>
-                         </select>
-                     </div>
-                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1"><Megaphone size={12}/> Marketing Focus</label>
-                         <select value={marketingFocus} onChange={e => setMarketingFocus(e.target.value)} className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                             <option>Chạy quảng cáo Facebook/Google</option>
-                             <option>Content Marketing (SEO)</option>
-                             <option>Thuê Influencer/KOL</option>
-                         </select>
-                     </div>
-                     <div>
-                         <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block">CEO Note</label>
-                         <textarea value={strategyNote} onChange={e => setStrategyNote(e.target.value)} className="w-full h-24 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none outline-none focus:ring-2 focus:ring-blue-500" placeholder="E.g. Focus on quality over speed..."></textarea>
-                     </div>
-                 </div>
+                  <div className="space-y-6">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.command.strategy')}</h4>
+                        <div className="h-1 w-12 bg-blue-100 rounded-full"></div>
+                      </div>
+                      
+                      <DirectiveSelector 
+                        label={t('dashboard.command.rdFocus')}
+                        icon={<Settings2 size={12}/>}
+                        value={rdFocus}
+                        onChange={setRdFocus}
+                        options={[
+                            t('dashboard.command.rdOptions.core'),
+                            t('dashboard.command.rdOptions.stability'),
+                            t('dashboard.command.rdOptions.research'),
+                            t('dashboard.command.rdOptions.none')
+                        ]}
+                      />
 
-                 {/* Funding */}
+                       <DirectiveSelector 
+                        label={t('dashboard.command.mktFocus')}
+                        icon={<Megaphone size={12}/>}
+                        value={marketingFocus}
+                        onChange={setMarketingFocus}
+                        options={[
+                            t('dashboard.command.mktOptions.ads'),
+                            t('dashboard.command.mktOptions.content'),
+                            t('dashboard.command.mktOptions.influencer'),
+                            t('dashboard.command.mktOptions.none')
+                        ]}
+                      />
+
+                      <div className="grid grid-cols-2 gap-4">
+                          <DirectiveSelector 
+                            label={t('dashboard.command.workMode')}
+                            icon={<Zap size={12}/>}
+                            value={t(`dashboard.command.workModes.${workMode.toLowerCase()}`)}
+                            onChange={(val) => {
+                                // Map back to enum
+                                if (val === t('dashboard.command.workModes.standard')) setWorkMode(WorkMode.STANDARD);
+                                if (val === t('dashboard.command.workModes.crunch')) setWorkMode(WorkMode.CRUNCH);
+                                if (val === t('dashboard.command.workModes.leisure')) setWorkMode(WorkMode.LEISURE);
+                            }}
+                            options={[
+                                t('dashboard.command.workModes.standard'),
+                                t('dashboard.command.workModes.crunch'),
+                                t('dashboard.command.workModes.leisure')
+                            ]}
+                          />
+                          <DirectiveSelector 
+                            label={t('dashboard.command.welfare')}
+                            icon={<Coffee size={12}/>}
+                            value={t(`dashboard.command.welfareLevels.${welfareLevel.toLowerCase()}`)}
+                            onChange={(val) => {
+                                if (val === t('dashboard.command.welfareLevels.minimal')) setWelfareLevel(WelfareLevel.MINIMAL);
+                                if (val === t('dashboard.command.welfareLevels.standard')) setWelfareLevel(WelfareLevel.STANDARD);
+                                if (val === t('dashboard.command.welfareLevels.premium')) setWelfareLevel(WelfareLevel.PREMIUM);
+                            }}
+                            options={[
+                                t('dashboard.command.welfareLevels.minimal'),
+                                t('dashboard.command.welfareLevels.standard'),
+                                t('dashboard.command.welfareLevels.premium')
+                            ]}
+                          />
+                      </div>
+
+                      <div className="space-y-3 group">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 px-1">
+                             <span className="p-1 bg-slate-100 rounded text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                <FileText size={12}/>
+                             </span>
+                             CEO Note
+                          </label>
+                          <textarea 
+                            value={strategyNote} 
+                            onChange={e => setStrategyNote(e.target.value)} 
+                            className="w-full h-24 text-xs p-3 bg-white border border-slate-200 rounded-xl resize-none outline-none focus:ring-4 focus:ring-blue-50/50 focus:border-blue-400 transition-all font-medium shadow-sm" 
+                            placeholder="E.g. Focus on quality over speed..."
+                          />
+                      </div>
+                  </div>
+
+                  {/* Funding */}
                  <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 space-y-3">
                      <div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><Landmark size={16}/> External Funding</div>
                      <select value={fundingRound} onChange={e => setFundingRound(e.target.value)} className="w-full text-xs p-2.5 bg-white/80 border border-amber-200 rounded-lg font-medium outline-none text-amber-900">
@@ -687,7 +866,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
              </div>
 
              <div className="p-4 border-t border-slate-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                 <Button onClick={() => onTurnSubmit({ rdFocus, marketingFocus, strategyNote, eventChoice: null })} disabled={isProcessing} isLoading={isProcessing} className="w-full py-4 text-sm shadow-blue-300/50 shadow-lg hover:scale-[1.02]">
+                 <Button onClick={() => onTurnSubmit({ rdFocus, marketingFocus, strategyNote, eventChoice: null, workMode, welfareLevel })} disabled={isProcessing} isLoading={isProcessing} className="w-full py-4 text-sm shadow-blue-300/50 shadow-lg hover:scale-[1.02]">
                      {activeEvent ? 'Resolve Event' : 'End Week'} <ArrowRight size={18}/>
                  </Button>
              </div>
@@ -797,7 +976,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
                                  <Button onClick={handleNegotiationSubmit} disabled={isProcessing || !negotiationMessage} className="px-5 shadow-lg shadow-blue-200"><Send size={18}/></Button>
                              </div>
                          ) : (
-                             <div className={`text-center font-bold p-4 rounded-xl ${activeNegotiation.status === 'partner' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{activeNegotiation.status === 'partner' ? "DEAL CLOSED" : "NEGOTIATION FAILED"}</div>
+                             <div className="text-center font-bold p-4 rounded-xl ${activeNegotiation.status === 'partner' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">{activeNegotiation.status === 'partner' ? "DEAL CLOSED" : "NEGOTIATION FAILED"}</div>
                          )}
                      </div>
                  </div>
