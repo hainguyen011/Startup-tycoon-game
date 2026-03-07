@@ -7,11 +7,11 @@ let currentProvider: LLMProvider = 'gemini';
 const STORAGE_KEY = 'startup_tycoon_api_key';
 
 const getSavedApiKey = () => {
-  try {
-    return localStorage.getItem(STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
+    try {
+        return localStorage.getItem(STORAGE_KEY) || '';
+    } catch {
+        return '';
+    }
 };
 
 let dynamicApiKey = getSavedApiKey();
@@ -19,20 +19,20 @@ let dynamicApiKey = getSavedApiKey();
 // --- CONFIGURATION METHODS ---
 
 export const setLLMConfig = (apiKey: string, provider: LLMProvider = 'gemini') => {
-  dynamicApiKey = apiKey.trim();
-  currentProvider = provider;
-  if (dynamicApiKey) {
-    try {
-      localStorage.setItem(STORAGE_KEY, dynamicApiKey);
-    } catch (e) {
-      console.error("Failed to save API key to localStorage", e);
+    dynamicApiKey = apiKey.trim();
+    currentProvider = provider;
+    if (dynamicApiKey) {
+        try {
+            localStorage.setItem(STORAGE_KEY, dynamicApiKey);
+        } catch (e) {
+            console.error("Failed to save API key to localStorage", e);
+        }
     }
-  }
 };
 
 export const getLLMConfig = () => ({
-  apiKey: dynamicApiKey,
-  provider: currentProvider
+    apiKey: dynamicApiKey,
+    provider: currentProvider
 });
 
 export const hasValidApiKey = () => !!dynamicApiKey && dynamicApiKey.length > 0;
@@ -40,130 +40,130 @@ export const hasValidApiKey = () => !!dynamicApiKey && dynamicApiKey.length > 0;
 // --- GENERIC LLM CALLER ---
 
 interface LLMRequest {
-  systemInstruction: string;
-  prompt: string;
-  responseSchema?: any; // For Gemini
-  jsonKeys?: string[]; // For OpenAI to help with prompt engineering
+    systemInstruction: string;
+    prompt: string;
+    responseSchema?: any; // For Gemini
+    jsonKeys?: string[]; // For OpenAI to help with prompt engineering
 }
 
 // Helper to clean Markdown JSON
 const cleanJSON = (text: string) => {
-  let clean = text.trim();
-  if (clean.startsWith('```json')) {
-    clean = clean.replace(/^```json/, '').replace(/```$/, '');
-  } else if (clean.startsWith('```')) {
-    clean = clean.replace(/^```/, '').replace(/```$/, '');
-  }
-  return clean;
+    let clean = text.trim();
+    if (clean.startsWith('```json')) {
+        clean = clean.replace(/^```json/, '').replace(/```$/, '');
+    } else if (clean.startsWith('```')) {
+        clean = clean.replace(/^```/, '').replace(/```$/, '');
+    }
+    return clean;
 };
 
 async function generateContentJSON<T>(request: LLMRequest): Promise<T> {
-  const { systemInstruction, prompt, responseSchema, jsonKeys } = request;
+    const { systemInstruction, prompt, responseSchema, jsonKeys } = request;
 
-  // --- GEMINI IMPLEMENTATION ---
-  if (currentProvider === 'gemini') {
-      const ai = new GoogleGenAI({ apiKey: dynamicApiKey });
-      const fullPrompt = `${systemInstruction}\n${prompt}`;
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: fullPrompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: responseSchema
+    // --- GEMINI IMPLEMENTATION ---
+    if (currentProvider === 'gemini') {
+        const ai = new GoogleGenAI({ apiKey: dynamicApiKey });
+        const fullPrompt = `${systemInstruction}\n${prompt}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: fullPrompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: responseSchema
+            }
+        });
+        return JSON.parse(cleanJSON(response.text || "{}")) as T;
+    }
+
+    // --- OPENAI / COMPATIBLE API IMPLEMENTATION ---
+    if (currentProvider === 'openai' || currentProvider === 'deepseek') {
+        const isDeepSeek = currentProvider === 'deepseek';
+        const baseUrl = isDeepSeek ? 'https://api.deepseek.com' : 'https://api.openai.com/v1';
+        const model = isDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini';
+
+        // OpenAI doesn't support the strict Schema object from Google SDK directly.
+        // We append a schema instruction to the system prompt.
+        let jsonInstruction = "Return valid JSON.";
+        if (jsonKeys && jsonKeys.length > 0) {
+            jsonInstruction += ` The JSON must contain keys: ${jsonKeys.join(', ')}.`;
         }
-      });
-      return JSON.parse(cleanJSON(response.text || "{}")) as T;
-  }
+        // Simple structure hint if complex schema is needed (approximation)
+        if (responseSchema && responseSchema.properties) {
+            jsonInstruction += ` Structure hint: ${JSON.stringify(Object.keys(responseSchema.properties))}`;
+        }
 
-  // --- OPENAI / COMPATIBLE API IMPLEMENTATION ---
-  if (currentProvider === 'openai' || currentProvider === 'deepseek') {
-      const isDeepSeek = currentProvider === 'deepseek';
-      const baseUrl = isDeepSeek ? 'https://api.deepseek.com' : 'https://api.openai.com/v1';
-      const model = isDeepSeek ? 'deepseek-chat' : 'gpt-4o-mini';
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${dynamicApiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: "system", content: `${systemInstruction}\n${jsonInstruction}` },
+                    { role: "user", content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.7
+            })
+        });
 
-      // OpenAI doesn't support the strict Schema object from Google SDK directly.
-      // We append a schema instruction to the system prompt.
-      let jsonInstruction = "Return valid JSON.";
-      if (jsonKeys && jsonKeys.length > 0) {
-          jsonInstruction += ` The JSON must contain keys: ${jsonKeys.join(', ')}.`;
-      }
-      // Simple structure hint if complex schema is needed (approximation)
-      if (responseSchema && responseSchema.properties) {
-          jsonInstruction += ` Structure hint: ${JSON.stringify(Object.keys(responseSchema.properties))}`;
-      }
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(`API Error ${response.status}: ${JSON.stringify(err)}`);
+        }
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${dynamicApiKey}`
-          },
-          body: JSON.stringify({
-              model: model,
-              messages: [
-                  { role: "system", content: `${systemInstruction}\n${jsonInstruction}` },
-                  { role: "user", content: prompt }
-              ],
-              response_format: { type: "json_object" },
-              temperature: 0.7
-          })
-      });
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content || "{}";
+        return JSON.parse(cleanJSON(text)) as T;
+    }
 
-      if (!response.ok) {
-          const err = await response.json();
-          throw new Error(`API Error ${response.status}: ${JSON.stringify(err)}`);
-      }
-
-      const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "{}";
-      return JSON.parse(cleanJSON(text)) as T;
-  }
-
-  throw new Error("Unsupported Provider");
+    throw new Error("Unsupported Provider");
 }
 
 // --- Helper to get system instruction based on language ---
 const getSystemInstruction = (lang: Language) => {
-  const isVi = lang === 'vi';
-  return isVi 
-    ? "Bạn là engine mô phỏng kinh doanh Startup chuyên sâu. BẮT BUỘC trả lời hoàn toàn bằng TIẾNG VIỆT. Tuyệt đối không pha trộn tiếng Anh trừ các thuật ngữ kỹ thuật không thể dịch. Phản hồi phải chuyên nghiệp, súc tích và mang tính chiến lược." 
-    : "You are an advanced Startup Business Simulation Engine. You MUST respond entirely in ENGLISH. Do not use any other language. Feedback should be professional, concise, and strategic.";
+    const isVi = lang === 'vi';
+    return isVi
+        ? "Bạn là engine mô phỏng kinh doanh Startup chuyên sâu. BẮT BUỘC trả lời hoàn toàn bằng TIẾNG VIỆT. Tuyệt đối không pha trộn tiếng Anh trừ các thuật ngữ kỹ thuật không thể dịch. Phản hồi phải chuyên nghiệp, súc tích và mang tính chiến lược."
+        : "You are an advanced Startup Business Simulation Engine. You MUST respond entirely in ENGLISH. Do not use any other language. Feedback should be professional, concise, and strategic.";
 };
 
 // --- RETRY LOGIC (Generic) ---
 
 async function callAIWithRetry<T>(
-  fn: () => Promise<T>,
-  retries = 3, 
-  delay = 2000
+    fn: () => Promise<T>,
+    retries = 3,
+    delay = 2000
 ): Promise<T> {
-  try {
-    return await fn();
-  } catch (error: any) {
-    const msg = (error.message || JSON.stringify(error)).toLowerCase();
-    
-    // Non-retryable errors
-    if (
-        msg.includes('401') || 
-        msg.includes('403') || 
-        msg.includes('api key') || 
-        msg.includes('invalid_api_key') ||
-        msg.includes('insufficient_quota') 
-    ) {
+    try {
+        return await fn();
+    } catch (error: any) {
+        const msg = (error.message || JSON.stringify(error)).toLowerCase();
+
+        // Non-retryable errors
+        if (
+            msg.includes('401') ||
+            msg.includes('403') ||
+            msg.includes('api key') ||
+            msg.includes('invalid_api_key') ||
+            msg.includes('insufficient_quota')
+        ) {
+            throw error;
+        }
+
+        const isRateLimit = msg.includes('429') || msg.includes('quota') || msg.includes('too many requests');
+        const isServerError = msg.includes('500') || msg.includes('503') || msg.includes('overloaded');
+
+        if (retries > 0 && (isRateLimit || isServerError)) {
+            console.warn(`API Busy/Error. Retrying in ${delay}ms... (${retries} left)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return callAIWithRetry(fn, retries - 1, delay * 2);
+        }
         throw error;
     }
-
-    const isRateLimit = msg.includes('429') || msg.includes('quota') || msg.includes('too many requests');
-    const isServerError = msg.includes('500') || msg.includes('503') || msg.includes('overloaded');
-    
-    if (retries > 0 && (isRateLimit || isServerError)) {
-      console.warn(`API Busy/Error. Retrying in ${delay}ms... (${retries} left)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return callAIWithRetry(fn, retries - 1, delay * 2);
-    }
-    throw error;
-  }
 }
 
 // ==========================================
@@ -175,26 +175,26 @@ async function callAIWithRetry<T>(
 // Interface moved to types.ts
 
 export const initializeGameStory = async (
-    industry: Industry, 
-    companyName: string, 
-    productName: string, 
-    productDesc: string, 
+    industry: Industry,
+    companyName: string,
+    productName: string,
+    productDesc: string,
     ceo: CEODetails,
-    language: Language, 
+    language: Language,
     config: { apiKey?: string, provider?: LLMProvider } = {}
 ): Promise<InitGameResponse> => {
-  
-  const { apiKey, provider = 'gemini' } = config;
-  
-  if (apiKey && apiKey.trim().length > 0) {
-      setLLMConfig(apiKey, provider);
-  } else {
-      currentProvider = provider;
-  }
 
-  const systemPrompt = getSystemInstruction(language);
-  
-  const prompt = `
+    const { apiKey, provider = 'gemini' } = config;
+
+    if (apiKey && apiKey.trim().length > 0) {
+        setLLMConfig(apiKey, provider);
+    } else {
+        currentProvider = provider;
+    }
+
+    const systemPrompt = getSystemInstruction(language);
+
+    const prompt = `
     Startup: "${companyName}" (${industry}).
     Product: "${productName}".
     Description: "${productDesc}".
@@ -213,32 +213,32 @@ export const initializeGameStory = async (
     IMPORTANT: All text fields must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}.
   `;
 
-  try {
-    return await callAIWithRetry(() => generateContentJSON<InitGameResponse>({
-        systemInstruction: systemPrompt,
-        prompt: prompt,
-        responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              marketContext: { type: Type.STRING },
-              competitorName: { type: Type.STRING },
-              initialFeedback: { type: Type.STRING },
-              initialProductAnalysis: { type: Type.STRING }
+    try {
+        return await callAIWithRetry(() => generateContentJSON<InitGameResponse>({
+            systemInstruction: systemPrompt,
+            prompt: prompt,
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    marketContext: { type: Type.STRING },
+                    competitorName: { type: Type.STRING },
+                    initialFeedback: { type: Type.STRING },
+                    initialProductAnalysis: { type: Type.STRING }
+                },
+                required: ['marketContext', 'competitorName', 'initialFeedback', 'initialProductAnalysis']
             },
-            required: ['marketContext', 'competitorName', 'initialFeedback', 'initialProductAnalysis']
-        },
-        jsonKeys: ['marketContext', 'competitorName', 'initialFeedback', 'initialProductAnalysis']
-    }));
-  } catch (error: any) {
-    console.error("Error initializing game:", error);
-    throw error; 
-  }
+            jsonKeys: ['marketContext', 'competitorName', 'initialFeedback', 'initialProductAnalysis']
+        }));
+    } catch (error: any) {
+        console.error("Error initializing game:", error);
+        throw error;
+    }
 };
 
 // --- CONTRACTS GENERATION ---
 export const generateContracts = async (industry: Industry, reputation: number, language: Language): Promise<Contract[]> => {
     const systemPrompt = getSystemInstruction(language);
-    
+
     const difficultyMultiplier = 1 + (reputation / 100);
     const rewardMultiplier = 1 + (reputation / 50);
 
@@ -298,10 +298,10 @@ export const generateContracts = async (industry: Industry, reputation: number, 
 // --- INVESTOR GENERATION ---
 export const generateInvestor = async (gameState: GameState, language: Language): Promise<Investor | null> => {
     const systemPrompt = getSystemInstruction(language);
-    
+
     // Simple valuation logic for prompt context
     const estimatedValuation = (gameState.products.reduce((acc, p) => acc + p.revenue, 0) * 12 * 5) + (gameState.users * 10);
-    
+
     const prompt = `
         Startup: ${gameState.companyName}. Industry: ${gameState.industry}.
         Stats: ${gameState.users} users, $${gameState.cash} cash.
@@ -346,17 +346,17 @@ export const generateInvestor = async (gameState: GameState, language: Language)
 
 // --- NEGOTIATION ---
 export const negotiateDeal = async (
-    investor: Investor, 
-    playerMessage: string, 
+    investor: Investor,
+    playerMessage: string,
     language: Language
-): Promise<{ 
-    message: string, 
-    newOffer?: { amount: number, equity: number }, 
-    isDeal: boolean, 
-    isWalkAway: boolean 
+): Promise<{
+    message: string,
+    newOffer?: { amount: number, equity: number },
+    isDeal: boolean,
+    isWalkAway: boolean
 }> => {
     const systemPrompt = getSystemInstruction(language);
-    
+
     const prompt = `
         Roleplay Investor: ${investor.name} (${investor.style}).
         Current Offer: $${investor.offerAmount} for ${investor.equityDemanded}%.
@@ -382,7 +382,7 @@ export const negotiateDeal = async (
                 type: Type.OBJECT,
                 properties: {
                     message: { type: Type.STRING },
-                    newOffer: { 
+                    newOffer: {
                         type: Type.OBJECT,
                         properties: { amount: { type: Type.INTEGER }, equity: { type: Type.NUMBER } },
                         nullable: true
@@ -401,10 +401,10 @@ export const negotiateDeal = async (
 
 export const askInvestorAdvice = async (investors: Investor[], gameState: GameState, language: Language): Promise<string> => {
     if (investors.length === 0) return "You have no board members yet.";
-    
+
     const systemPrompt = getSystemInstruction(language);
     const names = investors.map(i => i.name).join(", ");
-    
+
     const prompt = `
         Board Members: ${names}.
         Company: ${gameState.companyName}. Cash: ${gameState.cash}. Users: ${gameState.users}.
@@ -412,9 +412,9 @@ export const askInvestorAdvice = async (investors: Investor[], gameState: GameSt
         Give a short, strategic advice from the board's perspective to the CEO.
         Return JSON { advice: string }
     `;
-    
+
     try {
-        const res = await callAIWithRetry(() => generateContentJSON<{advice: string}>({
+        const res = await callAIWithRetry(() => generateContentJSON<{ advice: string }>({
             systemInstruction: systemPrompt,
             prompt: prompt,
             jsonKeys: ["advice"]
@@ -429,11 +429,17 @@ export const askInvestorAdvice = async (investors: Investor[], gameState: GameSt
 // --- HR ---
 export const generateCandidates = async (industry: Industry, turn: number, jobDescription: string, budget: number, language: Language): Promise<Candidate[]> => {
     const systemPrompt = getSystemInstruction(language);
-    
+
     const prompt = `
       Role: Witty Recruiter for ${industry}.
       Job Desc: "${jobDescription || 'Need talent'}"
       Target Monthly Salary Offer: $${budget}
+      
+      NAMING & PERSONALITY (CRITICAL):
+      - Names should be realistic for ${language === 'vi' ? 'Vietnam' : 'International context'} but with a touch of wit or memorability.
+      - Examples (VI): "Nam 'Bug-Hunter' Trần", "Linh 'Pixel' Nguyễn", "Hoàng 'Data-God' Lê".
+      - Examples (EN): "Sam 'Legacy-Code' Smith", "Sarah 'Vector' Jones", "Mike 'Deadline' Miller".
+      - Trait/Quirk should be funny and startup-related (e.g., "Only codes during full moons", "Can talk to printers", "Believes Jira is a religion").
       
       CRITICAL SALARY RULES:
       - You must generate candidates whose salary expectations are close to $${budget} (±20%).
@@ -443,73 +449,73 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
       - If Salary 2500-4500: Candidate is Senior. Skill MUST be 70-85.
       - If Salary > 4500: Candidate is Expert/Lead. Skill MUST be 85-100.
       
-      Create 3 detailed candidate CVs adhering to these rules.
+      Create 3 detailed candidate CVs adhering to these rules. All text must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}.
       
       Output format (JSON Array of objects).
     `;
-  
+
     try {
-      const candidates = await callAIWithRetry(() => generateContentJSON<any[]>({
-        systemInstruction: systemPrompt,
-        prompt: prompt,
-        responseSchema: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    name: { type: Type.STRING },
-                    role: { type: Type.STRING, enum: ['Developer', 'Designer', 'Marketer', 'Sales', 'Manager', 'Secretary', 'Tester'] },
-                    level: { type: Type.STRING, enum: ['Junior', 'Senior', 'Lead', 'Expert'] },
-                    skill: { type: Type.INTEGER },
-                    specificSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    salary: { type: Type.INTEGER },
-                    hireCost: { type: Type.INTEGER },
-                    bio: { type: Type.STRING },
-                    matchAnalysis: { type: Type.STRING },
-                    quirk: { type: Type.STRING },
-                    education: { type: Type.STRING },
-                    experienceYears: { type: Type.INTEGER },
-                    interviewNotes: { type: Type.STRING }
-                },
-                required: ['name', 'role', 'level', 'skill', 'specificSkills', 'salary', 'hireCost', 'bio', 'matchAnalysis', 'quirk', 'education', 'experienceYears', 'interviewNotes']
-            }
-        },
-        jsonKeys: ['name', 'role', 'level', 'skill', 'salary', 'hireCost', 'bio']
-      }));
-  
-      if (!Array.isArray(candidates)) return [];
-      
-      return candidates.map((c: any, index: number) => ({
-          ...c,
-          id: `cand-${Date.now()}-${index}`,
-          education: c.education || "Self-taught",
-          experienceYears: c.experienceYears !== undefined ? c.experienceYears : 1,
-          interviewNotes: c.interviewNotes || "Candidate seemed eager."
-      }));
+        const candidates = await callAIWithRetry(() => generateContentJSON<any[]>({
+            systemInstruction: systemPrompt,
+            prompt: prompt,
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING },
+                        role: { type: Type.STRING, enum: ['Developer', 'Designer', 'Marketer', 'Sales', 'Manager', 'Secretary', 'Tester'] },
+                        level: { type: Type.STRING, enum: ['Junior', 'Senior', 'Lead', 'Expert'] },
+                        skill: { type: Type.INTEGER },
+                        specificSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        salary: { type: Type.INTEGER },
+                        hireCost: { type: Type.INTEGER },
+                        bio: { type: Type.STRING },
+                        matchAnalysis: { type: Type.STRING },
+                        quirk: { type: Type.STRING },
+                        education: { type: Type.STRING },
+                        experienceYears: { type: Type.INTEGER },
+                        interviewNotes: { type: Type.STRING }
+                    },
+                    required: ['name', 'role', 'level', 'skill', 'specificSkills', 'salary', 'hireCost', 'bio', 'matchAnalysis', 'quirk', 'education', 'experienceYears', 'interviewNotes']
+                }
+            },
+            jsonKeys: ['name', 'role', 'level', 'skill', 'salary', 'hireCost', 'bio']
+        }));
+
+        if (!Array.isArray(candidates)) return [];
+
+        return candidates.map((c: any, index: number) => ({
+            ...c,
+            id: `cand-${Date.now()}-${index}`,
+            education: c.education || "Self-taught",
+            experienceYears: c.experienceYears !== undefined ? c.experienceYears : 1,
+            interviewNotes: c.interviewNotes || "Candidate seemed eager."
+        }));
 
     } catch (error) {
-      // Fallback based on budget
-      const fallbackSkill = budget < 1000 ? 35 : budget > 3000 ? 85 : 55;
-      const fallbackLevel = budget < 1000 ? 'Junior' : budget > 3000 ? 'Senior' : 'Junior';
-      
-      return [
-        {
-            id: `fallback-1`, 
-            name: "Dev Dave", 
-            role: 'Developer', 
-            level: fallbackLevel, 
-            skill: fallbackSkill, 
-            specificSkills: ['HTML', 'CSS'], 
-            salary: Math.floor(budget * 0.9), 
-            hireCost: 300, 
-            bio: "Fallback candidate.", 
-            matchAnalysis: "Matches budget.", 
-            quirk: "Codes with 1 hand.", 
-            education: "Online Course", 
-            experienceYears: 1, 
-            interviewNotes: "Available immediately."
-        }
-      ];
+        // Fallback based on budget
+        const fallbackSkill = budget < 1000 ? 35 : budget > 3000 ? 85 : 55;
+        const fallbackLevel = budget < 1000 ? 'Junior' : budget > 3000 ? 'Senior' : 'Junior';
+
+        return [
+            {
+                id: `fallback-1`,
+                name: "Dev Dave",
+                role: 'Developer',
+                level: fallbackLevel,
+                skill: fallbackSkill,
+                specificSkills: ['HTML', 'CSS'],
+                salary: Math.floor(budget * 0.9),
+                hireCost: 300,
+                bio: "Fallback candidate.",
+                matchAnalysis: "Matches budget.",
+                quirk: "Codes with 1 hand.",
+                education: "Online Course",
+                experienceYears: 1,
+                interviewNotes: "Available immediately."
+            }
+        ];
     }
 };
 
@@ -525,8 +531,8 @@ export interface PitchResult {
 
 export const evaluatePitch = async (gameState: GameState, fundingRound: string, language: Language): Promise<PitchResult> => {
     const systemPrompt = getSystemInstruction(language);
-    
-    const portfolio = gameState.products.map(p => 
+
+    const portfolio = gameState.products.map(p =>
         `- ${p.name} (${p.stage}): Qual ${p.quality}/100, Users ${p.users}, Rev $${p.revenue}/mo. ${p.activeFeedback[0] || ''}`
     ).join('\n');
 
@@ -577,29 +583,29 @@ export const evaluatePitch = async (gameState: GameState, fundingRound: string, 
 // --- Turn Processing ---
 
 export const processTurn = async (
-  gameState: GameState,
-  decisions: PlayerDecisions,
-  burnRate: number,
-  language: Language
+    gameState: GameState,
+    decisions: PlayerDecisions,
+    burnRate: number,
+    language: Language
 ): Promise<SimulationResult> => {
-  const systemPrompt = getSystemInstruction(language);
+    const systemPrompt = getSystemInstruction(language);
 
-  // Prepare Product Context
-  const productsContext = gameState.products.map(p => {
-      const team = gameState.employees.filter(e => e.assignedProductId === p.id);
-      const devPower = team.filter(e => e.role === 'Developer').reduce((sum, e) => sum + e.skill, 0);
-      return {
-          id: p.id,
-          name: p.name,
-          stage: p.stage,
-          currentStats: { quality: p.quality, bugs: p.bugs, users: p.users },
-          devPower
-      };
-  });
+    // Prepare Product Context
+    const productsContext = gameState.products.map(p => {
+        const team = gameState.employees.filter(e => e.assignedProductId === p.id);
+        const devPower = team.filter(e => e.role === 'Developer').reduce((sum, e) => sum + e.skill, 0);
+        return {
+            id: p.id,
+            name: p.name,
+            stage: p.stage,
+            currentStats: { quality: p.quality, bugs: p.bugs, users: p.users },
+            devPower
+        };
+    });
 
-  const marketingCost = MARKETING_COSTS[decisions.marketingFocus] || 0;
+    const marketingCost = MARKETING_COSTS[decisions.marketingFocus] || 0;
 
-  const prompt = `
+    const prompt = `
     Week ${gameState.turn}. Stage: ${gameState.stage}. 
     Market Condition: ${gameState.marketCondition}. (BULL = Growth boost, BEAT = Slump, NEUTRAL = Normal).
     
@@ -633,106 +639,106 @@ export const processTurn = async (
     CRITICAL: All narrative and report text must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}. Do not mix languages.
   `;
 
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-        narrative: { type: Type.STRING },
-        cashChange: { type: Type.INTEGER },
-        userChange: { type: Type.INTEGER },
-        moraleChange: { type: Type.INTEGER },
-        productUpdates: {
-            type: Type.ARRAY,
-            items: {
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            narrative: { type: Type.STRING },
+            cashChange: { type: Type.INTEGER },
+            userChange: { type: Type.INTEGER },
+            moraleChange: { type: Type.INTEGER },
+            productUpdates: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        productId: { type: Type.STRING },
+                        devProgressChange: { type: Type.INTEGER },
+                        qualityChange: { type: Type.INTEGER },
+                        bugChange: { type: Type.INTEGER },
+                        techDebtChange: { type: Type.INTEGER }, // New
+                        userChange: { type: Type.INTEGER },
+                        revenueChange: { type: Type.INTEGER },
+                        moduleUpdates: { // New
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    moduleId: { type: Type.STRING },
+                                    progressChange: { type: Type.INTEGER }
+                                },
+                                required: ["moduleId", "progressChange"]
+                            }
+                        },
+                        newFeedback: { type: Type.STRING, nullable: true }
+                    },
+                    required: ["productId", "devProgressChange", "qualityChange", "bugChange", "techDebtChange", "userChange", "revenueChange"]
+                }
+            },
+            secretaryReport: { type: Type.STRING, nullable: true },
+            randomEvent: {
                 type: Type.OBJECT,
                 properties: {
-                    productId: { type: Type.STRING },
-                    devProgressChange: { type: Type.INTEGER },
-                    qualityChange: { type: Type.INTEGER },
-                    bugChange: { type: Type.INTEGER },
-                    techDebtChange: { type: Type.INTEGER }, // New
-                    userChange: { type: Type.INTEGER },
-                    revenueChange: { type: Type.INTEGER },
-                    moduleUpdates: { // New
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    type: { type: Type.STRING, enum: ['crisis', 'opportunity', 'dilemma'] },
+                    options: {
                         type: Type.ARRAY,
                         items: {
                             type: Type.OBJECT,
                             properties: {
-                                moduleId: { type: Type.STRING },
-                                progressChange: { type: Type.INTEGER }
+                                label: { type: Type.STRING },
+                                risk: { type: Type.STRING }
                             },
-                            required: ["moduleId", "progressChange"]
+                            required: ['label', 'risk']
                         }
-                    },
-                    newFeedback: { type: Type.STRING, nullable: true }
+                    }
                 },
-                required: ["productId", "devProgressChange", "qualityChange", "bugChange", "techDebtChange", "userChange", "revenueChange"]
+                required: ["title", "description", "type", "options"],
+                nullable: true
+            },
+            skillXpEarned: {
+                type: Type.OBJECT,
+                properties: {
+                    management: { type: Type.INTEGER },
+                    tech: { type: Type.INTEGER },
+                    charisma: { type: Type.INTEGER }
+                },
+                nullable: true
             }
         },
-        secretaryReport: { type: Type.STRING, nullable: true },
-        randomEvent: {
-            type: Type.OBJECT,
-            properties: {
-                title: { type: Type.STRING },
-                description: { type: Type.STRING },
-                type: { type: Type.STRING, enum: ['crisis', 'opportunity', 'dilemma'] },
-                options: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            label: { type: Type.STRING },
-                            risk: { type: Type.STRING }
-                        },
-                        required: ['label', 'risk']
-                    }
-                }
-            },
-            required: ["title", "description", "type", "options"],
-            nullable: true
-        },
-        skillXpEarned: {
-            type: Type.OBJECT,
-            properties: {
-                management: { type: Type.INTEGER },
-                tech: { type: Type.INTEGER },
-                charisma: { type: Type.INTEGER }
-            },
-            nullable: true
-        }
-    },
-    required: ["narrative", "cashChange", "userChange", "moraleChange", "productUpdates"]
-  };
-
-  try {
-    return await callAIWithRetry(() => generateContentJSON<SimulationResult>({
-        systemInstruction: systemPrompt,
-        prompt: prompt,
-        responseSchema: schema,
-        jsonKeys: ["narrative", "cashChange", "userChange", "moraleChange", "productUpdates"]
-    }));
-
-  } catch (error) {
-    console.error("Error processing turn:", error);
-    // Fallback logic on error (Assume 0 revenue if AI fails, expense logic handled in App.tsx)
-    return {
-      narrative: language === 'vi' ? "Hệ thống đang quá tải... (Vẫn trừ chi phí cố định)" : "System overloaded... (Fixed costs deducted)",
-      cashChange: 0,
-      userChange: 0,
-      moraleChange: -1,
-      productUpdates: [],
-      equityChange: 0,
-      competitorUpdate: "",
-      advice: "Try again later.",
-      randomEvent: null
+        required: ["narrative", "cashChange", "userChange", "moraleChange", "productUpdates"]
     };
-  }
+
+    try {
+        return await callAIWithRetry(() => generateContentJSON<SimulationResult>({
+            systemInstruction: systemPrompt,
+            prompt: prompt,
+            responseSchema: schema,
+            jsonKeys: ["narrative", "cashChange", "userChange", "moraleChange", "productUpdates"]
+        }));
+
+    } catch (error) {
+        console.error("Error processing turn:", error);
+        // Fallback logic on error (Assume 0 revenue if AI fails, expense logic handled in App.tsx)
+        return {
+            narrative: language === 'vi' ? "Hệ thống đang quá tải... (Vẫn trừ chi phí cố định)" : "System overloaded... (Fixed costs deducted)",
+            cashChange: 0,
+            userChange: 0,
+            moraleChange: -1,
+            productUpdates: [],
+            equityChange: 0,
+            competitorUpdate: "",
+            advice: "Try again later.",
+            randomEvent: null
+        };
+    }
 };
 
 export const chatWithEmployee = async (employee: Employee, gameState: GameState, message: string, language: Language): Promise<string> => {
     const systemPrompt = getSystemInstruction(language);
     const prompt = `Roleplay employee ${employee.name} (${employee.role}). Boss asks: "${message}". Reply short. Return JSON: { response: string }`;
     try {
-        const res = await callAIWithRetry(() => generateContentJSON<{response: string}>({
+        const res = await callAIWithRetry(() => generateContentJSON<{ response: string }>({
             systemInstruction: systemPrompt,
             prompt: prompt,
             jsonKeys: ['response']
@@ -749,7 +755,7 @@ interface IntelResponse {
 
 export const getAdvisorInsight = async (gameState: GameState, type: IntelType, language: Language): Promise<IntelResponse> => {
     const systemPrompt = getSystemInstruction(language);
-    
+
     // More detailed prompt for better intelligence results
     const prompt = `
         Role: Elite Business Intelligence Consultant for Startup "${gameState.companyName}" in ${gameState.industry}.
@@ -771,7 +777,7 @@ export const getAdvisorInsight = async (gameState: GameState, type: IntelType, l
             "reliability": 85 (integer 0-100)
         }
     `;
-    
+
     try {
         const res = await callAIWithRetry(() => generateContentJSON<IntelResponse>({
             systemInstruction: systemPrompt,
@@ -788,11 +794,11 @@ export const getAdvisorInsight = async (gameState: GameState, type: IntelType, l
             jsonKeys: ['content', 'source', 'reliability']
         }));
         return res;
-    } catch { 
-        return { 
-            content: "Network compromised. Data unavailable.", 
-            source: "Unknown", 
-            reliability: 0 
-        }; 
+    } catch {
+        return {
+            content: "Network compromised. Data unavailable.",
+            source: "Unknown",
+            reliability: 0
+        };
     }
 };
