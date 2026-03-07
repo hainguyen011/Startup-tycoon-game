@@ -6,7 +6,7 @@ import { translations, getTranslation } from './translations';
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -14,7 +14,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('vi'); // Default to Vietnamese
 
-  const t = (path: string): string => {
+  const t = (path: string, params?: Record<string, string | number>): string => {
     const keys = path.split('.');
     let current: any = getTranslation(language);
     
@@ -26,7 +26,16 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         return path;
       }
     }
-    return typeof current === 'string' ? current : path;
+    
+    let result = typeof current === 'string' ? current : path;
+    
+    if (params && typeof result === 'string') {
+        Object.keys(params).forEach(key => {
+            result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(params[key]));
+        });
+    }
+    
+    return result;
   };
 
   return (

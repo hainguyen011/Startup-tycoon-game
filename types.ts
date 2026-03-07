@@ -24,6 +24,20 @@ export enum IntelType {
   INTERNAL = 'INTERNAL'
 }
 
+export enum MarketCondition {
+  BULL = 'BULL',
+  BEAR = 'BEAR',
+  NEUTRAL = 'NEUTRAL'
+}
+
+export interface AICompanion {
+  id: string;
+  name: string;
+  role: string;
+  specialty: string;
+  avatar: string; 
+}
+
 export interface IntelItem {
   id: string;
   type: IntelType;
@@ -55,6 +69,10 @@ export interface Employee {
   traits: string[]; 
   assignedProductId?: string | null; // Link to a product
   assignedContractId?: string | null; // Link to a contract
+  
+  // Big Update 1.0 - 3D Office & Culture
+  personality?: string;
+  position3D?: [number, number, number];
 }
 
 export interface Candidate {
@@ -278,8 +296,10 @@ export interface GameState {
   history: SimulationResult[];
   stage: GameStage;
   marketContext: string; 
+  marketCondition: MarketCondition; // New
   competitorName: string;
   gameOverReason?: string;
+  council: AICompanion[]; // New
 }
 
 export interface InitialGameStoryResponse {

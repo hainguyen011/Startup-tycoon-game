@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SetupGame from './components/SetupGame';
 import { GameDashboard } from './components/GameDashboard';
-import { GameState, GameStage, Industry, PlayerDecisions, INITIAL_CASH, SimulationResult, IntelType, IntelItem, INITIAL_FACILITIES, INITIAL_SKILLS, Employee, Candidate, Product, ProductStage, LLMProvider, MARKETING_COSTS, Contract, Investor } from './types';
+import { GameState, GameStage, Industry, PlayerDecisions, INITIAL_CASH, SimulationResult, IntelType, IntelItem, INITIAL_FACILITIES, INITIAL_SKILLS, Employee, Candidate, Product, ProductStage, LLMProvider, MARKETING_COSTS, Contract, Investor, MarketCondition, AICompanion } from './types';
 import { initializeGameStory, processTurn, getAdvisorInsight, generateCandidates, chatWithEmployee, evaluatePitch, setLLMConfig, hasValidApiKey, generateContracts, generateInvestor, negotiateDeal, askInvestorAdvice } from './services/gemini';
 import { Loader2 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './LanguageContext';
@@ -27,6 +27,7 @@ const GameContainer: React.FC = () => {
     history: [],
     stage: GameStage.SETUP,
     marketContext: '',
+    marketCondition: MarketCondition.NEUTRAL,
     competitorName: '',
     employees: [],
     candidates: [], 
@@ -34,7 +35,12 @@ const GameContainer: React.FC = () => {
     contracts: [],
     investors: [],
     facilities: JSON.parse(JSON.stringify(INITIAL_FACILITIES)), 
-    playerSkills: { ...INITIAL_SKILLS }
+    playerSkills: { ...INITIAL_SKILLS },
+    council: [
+      { id: 'council-1', name: 'Monica Hall', role: 'Finance Advisor', specialty: 'Investment & Valuation', avatar: '💼' },
+      { id: 'council-2', name: 'Bertram Gilfoyle', role: 'System Architect', specialty: 'Infrastructure & Security', avatar: '💻' },
+      { id: 'council-3', name: 'Dinesh Chugtai', role: 'Senior Developer', specialty: 'High-speed Coding', avatar: '🚀' }
+    ]
   });
 
   const [systemError, setSystemError] = useState<string | null>(null);
@@ -64,8 +70,7 @@ const GameContainer: React.FC = () => {
 
     // Initial check (falls back to env if userApiKey is empty)
     if (!hasValidApiKey()) {
-        const msg = language === 'vi' ? "Vui lòng nhập API Key để bắt đầu!" : "Please enter API Key to start!";
-        setSetupError(msg);
+        setSetupError(t('alerts.apiKeyRequired'));
         return;
     }
 
@@ -120,17 +125,15 @@ const GameContainer: React.FC = () => {
       }));
     } catch (e: any) {
       console.error(e);
-      let errMsg = "System Error. Please check API Key or Network.";
+      let errMsg = t('alerts.systemError');
       const msg = e.message || '';
       
       if (msg.includes('insufficient_quota')) {
-          errMsg = language === 'vi' 
-            ? "API Key đã hết hạn mức sử dụng (Quota). Vui lòng kiểm tra billing hoặc nạp thêm credit." 
-            : "API Key quota exceeded (Insufficient Quota). Please check billing/credits.";
+          errMsg = t('alerts.quotaExceeded');
       } else if (msg.includes('401') || msg.includes('403') || msg.includes('API key')) {
-          errMsg = language === 'vi' ? "API Key không hợp lệ." : "Invalid API Key.";
+          errMsg = t('alerts.invalidKey');
       } else if (msg.includes('429') || msg.includes('quota')) {
-          errMsg = language === 'vi' ? "Yêu cầu quá nhanh hoặc hết hạn mức (429)." : "Too many requests or quota exceeded (429).";
+          errMsg = t('alerts.tooManyRequests');
       }
       
       // If error happens during setup, keep user on setup screen to fix it
@@ -179,7 +182,7 @@ const GameContainer: React.FC = () => {
   const handleRecruit = async (jobDesc: string, budget: number) => {
       const recruitmentCost = 500;
       if (gameState.cash < recruitmentCost) {
-          alert(language === 'vi' ? "Không đủ tiền ($500)!" : "Not enough funds ($500)!");
+          alert(t('alerts.noFundsRecruit'));
           return;
       }
       setLoading(true);
@@ -200,15 +203,23 @@ const GameContainer: React.FC = () => {
   const handleHireCandidate = (candidate: Candidate) => {
       const office = gameState.facilities.find(f => f.id === 'office');
       if (office && gameState.employees.length >= office.value) {
-          alert(language === 'vi' ? "Văn phòng đã đầy!" : "Office is full!");
+          alert(t('alerts.officeFull'));
           return;
       }
       if (gameState.cash < candidate.hireCost) {
-          alert(language === 'vi' ? "Không đủ tiền tuyển dụng!" : "Not enough funds to hire!");
+          alert(t('alerts.noFundsHire'));
           return;
       }
 
-      const possibleTraits = ["Siêng năng", "Lười biếng", "Trung thành", "Dễ tự ái", "Tham vọng", "Hòa đồng", "Lập dị"];
+      const possibleTraits = [
+          t('traits.diligent'),
+          t('traits.lazy'),
+          t('traits.loyal'),
+          t('traits.sensitive'),
+          t('traits.ambitious'),
+          t('traits.sociable'),
+          t('traits.eccentric')
+      ];
       const randomTraits = [possibleTraits[Math.floor(Math.random() * possibleTraits.length)]];
       if (Math.random() > 0.5) randomTraits.push(possibleTraits[Math.floor(Math.random() * possibleTraits.length)]);
 
@@ -393,14 +404,14 @@ const GameContainer: React.FC = () => {
                   cash: prev.cash + updatedInv.offerAmount,
                   equity: Math.max(0, prev.equity - updatedInv.equityDemanded),
                   history: [...prev.history, {
-                      narrative: `Investment Deal Closed! ${updatedInv.name} invested $${updatedInv.offerAmount.toLocaleString()} for ${updatedInv.equityDemanded}% equity.`,
+                      narrative: t('history.investmentDeal', { name: updatedInv.name, amount: updatedInv.offerAmount.toLocaleString(), equity: updatedInv.equityDemanded }),
                       cashChange: updatedInv.offerAmount,
                       equityChange: -updatedInv.equityDemanded,
                       userChange: 0,
                       moraleChange: 10,
                       productUpdates: [],
                       competitorUpdate: "",
-                      advice: "Expand aggressively.",
+                      advice: t('history.expandAggressively'),
                       randomEvent: null
                   }]
               };
@@ -417,7 +428,7 @@ const GameContainer: React.FC = () => {
       
       setLoading(true);
       const advice = await askInvestorAdvice(partners, gameState, language);
-      alert(`Board Advice: ${advice}`);
+      alert(t('history.boardAdvice', { advice }));
       setLoading(false);
   };
 
@@ -447,14 +458,14 @@ const GameContainer: React.FC = () => {
                   cash: prev.cash + result.investmentAmount,
                   equity: Math.max(0, Number((prev.equity - result.equityDemanded).toFixed(1))),
                   history: [...prev.history, {
-                      narrative: `FUNDING SECURED! ${result.investorFeedback}`,
+                      narrative: `${t('history.pitchSecured')} ${result.investorFeedback}`,
                       cashChange: result.investmentAmount,
                       equityChange: -result.equityDemanded,
                       userChange: 0,
                       moraleChange: 10,
                       productUpdates: [],
                       competitorUpdate: "",
-                      advice: "Spend wisely.",
+                      advice: t('history.spendWisely'),
                       randomEvent: null
                   }]
               }));
@@ -464,14 +475,14 @@ const GameContainer: React.FC = () => {
                   ...prev,
                   morale: Math.max(0, prev.morale - 5), // Rejected hurts morale
                   history: [...prev.history, {
-                      narrative: `PITCH REJECTED. ${result.investorFeedback}`,
+                      narrative: `${t('history.pitchRejected')} ${result.investorFeedback}`,
                       cashChange: 0,
                       equityChange: 0,
                       userChange: 0,
                       moraleChange: -5,
                       productUpdates: [],
                       competitorUpdate: "",
-                      advice: "Improve stats and try again.",
+                      advice: t('history.improveStats'),
                       randomEvent: null
                   }]
               }));
@@ -641,7 +652,14 @@ const GameContainer: React.FC = () => {
         let gameOverReason = undefined;
         if (newCash < -10000) { 
             newStage = GameStage.GAME_OVER;
-            gameOverReason = language === 'vi' ? "Phá sản (Nợ > $10k)." : "Bankrupt (Debt > $10k).";
+            gameOverReason = t('alerts.bankrupt');
+        }
+
+        // Market Condition Logic
+        let newMarketCondition = prev.marketCondition;
+        if (prev.turn % 5 === 0 && Math.random() > 0.5) {
+            const conditions = [MarketCondition.BULL, MarketCondition.BEAR, MarketCondition.NEUTRAL];
+            newMarketCondition = conditions[Math.floor(Math.random() * conditions.length)];
         }
 
         return {
@@ -657,6 +675,7 @@ const GameContainer: React.FC = () => {
           turn: prev.turn + 1,
           history: [...prev.history, result],
           stage: newStage,
+          marketCondition: newMarketCondition,
           gameOverReason
         };
       });
@@ -665,7 +684,7 @@ const GameContainer: React.FC = () => {
 
     } catch (e) {
       console.error(e);
-      setSystemError("Error processing turn. Please try again.");
+      setSystemError(t('alerts.errorTurn'));
     } finally {
       setLoading(false);
     }
@@ -679,7 +698,7 @@ const GameContainer: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-800 bg-grid-pattern">
         <div className="bg-white border border-red-200 p-8 rounded-xl max-w-md text-center shadow-xl">
-            <h2 className="text-xl font-bold text-red-600 mb-2">System Failure</h2>
+            <h2 className="text-xl font-bold text-red-600 mb-2">{t('alerts.systemFailure')}</h2>
             <p className="text-slate-600">{systemError}</p>
             <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm text-slate-700">Reload</button>
         </div>
@@ -705,6 +724,7 @@ const GameContainer: React.FC = () => {
             <GameDashboard 
                 state={gameState}
                 currentIntel={currentIntel}
+                activeEvent={gameState.history[gameState.history.length - 1]?.randomEvent || null}
                 onTurnSubmit={handleTurnSubmit}
                 onBuyIntel={handleBuyIntel}
                 onDismissIntel={handleDismissIntel}
@@ -714,7 +734,7 @@ const GameContainer: React.FC = () => {
                 onUpgradeFacility={handleUpgradeFacility}
                 isProcessing={loading} 
                 onRestart={handleRestart}
-                onEventDecision={handleEventDecision}
+                handleEventChoice={handleEventDecision}
                 onChatWithEmployee={handleChatWithEmployee}
                 onAssignEmployee={handleAssignEmployee}
                 onAssignToModule={handleAssignToModule}

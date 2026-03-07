@@ -3,6 +3,18 @@ import { Language } from "./types";
 
 export const translations = {
   en: {
+    common: {
+      male: "Male",
+      female: "Female",
+      other: "Other",
+      back: "Back",
+      confirm: "Confirm",
+      cancel: "Cancel",
+      close: "Close",
+      save: "Save",
+      loading: "Loading...",
+      unassigned: "Unassigned",
+    },
     setup: {
       title: "Startup Tycoon AI",
       subtitle: "Build the next Silicon Valley empire. Simulated by AI.",
@@ -49,6 +61,17 @@ export const translations = {
       available: "Available",
       endWeek: "End Week",
       resolveAlert: "Resolve Alert First",
+      reputation: "Corporate Reputation",
+      ops: "Operations",
+      admin: "Administration",
+      chat: {
+        typing: "Typing...",
+        placeholder: "Type a message..."
+      },
+      funding: {
+        title: "External Funding",
+        pitch: "Pitch Investors"
+      },
       tabs: {
         overview: "Overview",
         products: "Products",
@@ -58,12 +81,20 @@ export const translations = {
         infra: "Infra",
         founder: "Founder",
         contracts: "Contracts",
-        investment: "Investment"
+        investment: "Investment",
+        council: "AI Council"
       },
       products: {
+        title: "Product Portfolio",
         techDebt: "Technical Debt",
         modulesTitle: "Technical Modules",
         unassigned: "Unassigned",
+        newProduct: "New Product",
+        launchNewProduct: "Launch New Product",
+        startDev: "Start Development",
+        monthlyRevenue: "Monthly Revenue",
+        devProgress: "Dev Progress",
+        quality: "Quality",
         modules: {
           core: "Core Engine",
           ui: "User Interface",
@@ -88,7 +119,9 @@ export const translations = {
         valuation: "Est. Valuation",
         growth: "Growth Trajectory",
         marketShare: "Market Share",
-        competitor: "Key Competitor"
+        competitor: "Key Competitor",
+        health: "Company Health",
+        avgStress: "Avg Stress"
       },
       actions: {
         pitch: "Pitch",
@@ -106,8 +139,20 @@ export const translations = {
         negotiate: "Negotiate",
         accept: "Accept",
         reject: "Reject",
-        askAdvice: "Ask Advice"
+        askAdvice: "Ask Advice",
+        reqAdvice: "Request Advice",
+        chat: "Chat",
+        findInvestors: "Find Investors",
+        boardAdvice: "Board Advice",
+        negotiateDeal: "Negotiate Deal",
+        resolveEvent: "Resolve Event",
+        endTurn: "End Week"
       },
+      event: {
+        priorityAlert: "Priority Alert",
+        ignore: "Ignore & Continue"
+      },
+
       command: {
         title: "Command Center",
         intel: "Intelligence Network",
@@ -139,7 +184,9 @@ export const translations = {
             minimal: "Minimal",
             standard: "Standard",
             premium: "Premium"
-        }
+        },
+        ceoNote: "CEO Note",
+        ceoNotePlaceholder: "E.g. Focus on quality over speed..."
       },
       directiveSelector: {
           back: "Back",
@@ -149,8 +196,17 @@ export const translations = {
       intel: {
         market: "Market Research",
         competitor: "Spy Competitor",
-        internal: "Internal Audit"
+        internal: "Internal Audit",
+        title: "Intel Report",
+        briefing: "Top Secret",
+        source: "Source",
+        reliability: "Reliability",
+        eyesOnly: "Eyes Only",
+        burnAfterReading: "Burn After Reading",
+        confidential: "Confidential",
+        close: "Close Intelligence"
       },
+
       contracts: {
         active: "Active Contracts",
         available: "Available Contracts",
@@ -161,7 +217,9 @@ export const translations = {
         penalty: "Penalty",
         effort: "Progress",
         completed: "COMPLETED",
-        failed: "FAILED"
+        failed: "FAILED",
+        noActive: "No active contracts",
+        opportunities: "Available Opportunities"
       },
       investment: {
         activeInvestors: "Board of Directors",
@@ -171,17 +229,107 @@ export const translations = {
         equity: "Equity",
         offer: "Offer",
         turnsLeft: "Turns Left",
-        chatPlaceholder: "Counter-offer (e.g., 'I want $2M for 10%')..."
+        chatPlaceholder: "Counter-offer (e.g., 'I want $2M for 10%')...",
+        estValuation: "Estimated Valuation",
+        investor: "Investor",
+        patience: "Patience",
+        dealClosed: "DEAL CLOSED",
+        dealFailed: "NEGOTIATION FAILED"
+      },
+      team: {
+        manage: "Manage Team",
+        recruit: "Recruit",
+        headhunting: "Headhunting Params",
+        roleDesc: "Role Description",
+        maxBudget: "Max Budget",
+        findCandidates: "Find Candidates",
+        viewProfile: "View Profile",
+        wage: "Wage",
+        morale: "Morale",
+        skill: "Skill",
+        interviewNotes: "Interview Notes",
+        hireNow: "Hire Now",
+        pass: "Pass"
+      },
+      founder: {
+          skills: {
+              mgmt: "Management",
+              tech: "Technical",
+              charisma: "Charisma"
+          },
+          interests: "Personal Interests",
+          noInterests: "No interests listed",
+          narrative: "Founder Narrative",
+          role: "Chief Executive Officer"
+      },
+      council: {
+          title: "The Council",
+          subtitle: "Your elite team of specialized AI advisors.",
+          specialty: "Specialty"
+      },
+      infra: {
+          maxed: "Maxed Out",
+          upgrade: "Upgrade"
       }
     },
     gameover: {
       title: "Game Over",
       victory: "Unicorn Status!",
       reason: "Your startup has ceased operations.",
-      restart: "Play Again"
+      restart: "Play Again",
+      finalUsers: "Final Users",
+      equityKept: "Equity Kept"
+    },
+    market: {
+        bull: "BULL MARKET",
+        bear: "BEAR MARKET",
+        stable: "STABLE"
+    },
+    alerts: {
+        apiKeyRequired: "Please enter API Key to start!",
+        quotaExceeded: "API Key quota exceeded. Please check billing/credits.",
+        invalidKey: "Invalid API Key.",
+        tooManyRequests: "Too many requests or quota exceeded (429).",
+        officeFull: "Office is full!",
+        noFundsRecruit: "Not enough funds ($500)!",
+        noFundsHire: "Not enough funds to hire!",
+        errorTurn: "Error processing turn. Please try again.",
+        systemError: "System Error. Please check API Key or Network.",
+        bankrupt: "Bankrupt (Debt > $10k).",
+        systemFailure: "System Failure"
+    },
+    history: {
+        investmentDeal: "Investment Deal Closed! {name} invested ${amount} for {equity}% equity.",
+        pitchSecured: "FUNDING SECURED!",
+        pitchRejected: "PITCH REJECTED.",
+        expandAggressively: "Expand aggressively.",
+        spendWisely: "Spend wisely.",
+        improveStats: "Improve stats and try again.",
+        boardAdvice: "Board Advice: {advice}"
+    },
+    traits: {
+        diligent: "Diligent",
+        lazy: "Lazy",
+        loyal: "Loyal",
+        sensitive: "Sensitive",
+        ambitious: "Ambitious",
+        sociable: "Sociable",
+        eccentric: "Eccentric"
     }
   },
   vi: {
+    common: {
+      male: "Nam",
+      female: "Nữ",
+      other: "Khác",
+      back: "Quay lại",
+      confirm: "Xác nhận",
+      cancel: "Hủy",
+      close: "Đóng",
+      save: "Lưu",
+      loading: "Đang tải...",
+      unassigned: "Chưa gán",
+    },
     setup: {
       title: "Startup Tycoon AI",
       subtitle: "Xây dựng đế chế công nghệ tiếp theo. trải nghiệm hệ thống điều phối thông minh với tính năng AI chuyên nghiệp ",
@@ -228,6 +376,17 @@ export const translations = {
       available: "Khả dụng",
       endWeek: "Kết thúc tuần",
       resolveAlert: "Xử lý thông báo trước",
+      reputation: "Uy tín công ty",
+      ops: "Vận hành",
+      admin: "Quản trị",
+      chat: {
+        typing: "Đang nhập...",
+        placeholder: "Nhập tin nhắn..."
+      },
+      funding: {
+        title: "Huy động vốn bên ngoài",
+        pitch: "Thuyết phục nhà đầu tư"
+      },
       tabs: {
         overview: "Tổng quan",
         products: "Sản phẩm",
@@ -237,12 +396,20 @@ export const translations = {
         infra: "Hạ tầng",
         founder: "Founder",
         contracts: "Hợp đồng",
-        investment: "Đầu tư"
+        investment: "Đầu tư",
+        council: "Hội đồng AI"
       },
       products: {
+        title: "Danh mục sản phẩm",
         techDebt: "Nợ kỹ thuật",
         modulesTitle: "Module Kỹ thuật",
         unassigned: "Chưa gán",
+        newProduct: "Sản phẩm mới",
+        launchNewProduct: "Triển khai sản phẩm mới",
+        startDev: "Bắt đầu phát triển",
+        monthlyRevenue: "Doanh thu tháng",
+        devProgress: "Tiến độ phát triển",
+        quality: "Chất lượng",
         modules: {
           core: "Hệ thống lõi",
           ui: "Giao diện người dùng",
@@ -267,7 +434,9 @@ export const translations = {
         valuation: "Định giá",
         growth: "Biểu đồ tăng trưởng",
         marketShare: "Thị phần",
-        competitor: "Đối thủ chính"
+        competitor: "Đối thủ chính",
+        health: "Sức khỏe công ty",
+        avgStress: "Căng thẳng TB"
       },
       actions: {
         pitch: "Gọi vốn",
@@ -285,8 +454,20 @@ export const translations = {
         negotiate: "Đàm phán",
         accept: "Chấp nhận",
         reject: "Từ chối",
-        askAdvice: "Xin lời khuyên"
+        askAdvice: "Xin lời khuyên",
+        reqAdvice: "Yêu cầu lời khuyên",
+        chat: "Trò chuyện",
+        findInvestors: "Tìm nhà đầu tư",
+        boardAdvice: "Lời khuyên HĐQT",
+        negotiateDeal: "Đàm phán thương vụ",
+        resolveEvent: "Giải quyết sự kiện",
+        endTurn: "Kết thúc tuần"
       },
+      event: {
+        priorityAlert: "Cảnh báo khẩn cấp",
+        ignore: "Bỏ qua & Tiếp tục"
+      },
+
       command: {
         title: "Bàn làm việc của CEO",
         intel: "Mạng lưới thông tin",
@@ -318,7 +499,9 @@ export const translations = {
             minimal: "Tối giản",
             standard: "Cơ bản",
             premium: "Cao cấp"
-        }
+        },
+        ceoNote: "Ghi chú của CEO",
+        ceoNotePlaceholder: "VD: Tập trung vào chất lượng hơn tốc độ..."
       },
       directiveSelector: {
           back: "Quay lại",
@@ -328,8 +511,17 @@ export const translations = {
       intel: {
         market: "Nghiên cứu thị trường",
         competitor: "Do thám đối thủ",
-        internal: "Kiểm toán nội bộ"
+        internal: "Kiểm toán nội bộ",
+        title: "Báo cáo tình báo",
+        briefing: "Tối mật",
+        source: "Nguồn",
+        reliability: "Độ tin cậy",
+        eyesOnly: "Chỉ dành cho cấp quản lý",
+        burnAfterReading: "Tiêu hủy sau khi đọc",
+        confidential: "Bảo mật",
+        close: "Đóng báo cáo"
       },
+
       contracts: {
         active: "Hợp đồng đang chạy",
         available: "Hợp đồng khả dụng",
@@ -340,7 +532,9 @@ export const translations = {
         penalty: "Phạt",
         effort: "Tiến độ",
         completed: "HOÀN THÀNH",
-        failed: "THẤT BẠI"
+        failed: "THẤT BẠI",
+        noActive: "Không có hợp đồng nào",
+        opportunities: "Cơ hội khả dụng"
       },
       investment: {
         activeInvestors: "Hội đồng quản trị",
@@ -350,14 +544,92 @@ export const translations = {
         equity: "Cổ phần",
         offer: "Đề nghị",
         turnsLeft: "Lượt đàm phán",
-        chatPlaceholder: "Đưa ra đề nghị (VD: Tôi muốn $2M cho 10%)..."
+        chatPlaceholder: "Đưa ra đề nghị (VD: Tôi muốn $2M cho 10%)...",
+        estValuation: "Định giá ước tính",
+        investor: "Nhà đầu tư",
+        patience: "Sự kiên nhẫn",
+        dealClosed: "THƯƠNG VỤ HOÀN TẤT",
+        dealFailed: "ĐÀM PHÁN THẤT BẠI"
+      },
+      team: {
+        manage: "Quản lý nhân sự",
+        recruit: "Tuyển dụng",
+        headhunting: "Thông số tuyển dụng",
+        roleDesc: "Mô tả vị trí",
+        maxBudget: "Ngân sách tối đa",
+        findCandidates: "Tìm ứng viên",
+        viewProfile: "Xem hồ sơ",
+        wage: "Lương",
+        morale: "Tinh thần",
+        skill: "Kỹ năng",
+        interviewNotes: "Ghi chú phỏng vấn",
+        hireNow: "Tuyển ngay",
+        pass: "Bỏ qua"
+      },
+      founder: {
+          skills: {
+              mgmt: "Quản lý",
+              tech: "Kỹ thuật",
+              charisma: "Sức hút"
+          },
+          interests: "Sở thích cá nhân",
+          noInterests: "Chưa liệt kê sở thích",
+          narrative: "Tiểu sử Founder",
+          role: "Giám đốc điều hành"
+      },
+      council: {
+          title: "Hội đồng AI",
+          subtitle: "Đội ngũ cố vấn AI chuyên biệt của bạn.",
+          specialty: "Chuyên môn"
+      },
+      infra: {
+          maxed: "Cấp tối đa",
+          upgrade: "Nâng cấp"
       }
     },
     gameover: {
       title: "Game Over",
       victory: "Kỳ Lân Công Nghệ!",
       reason: "Startup của bạn đã dừng bước.",
-      restart: "Chơi lại từ đầu"
+      restart: "Chơi lại từ đầu",
+      finalUsers: "Người dùng cuối",
+      equityKept: "Cổ phần còn lại"
+    },
+    market: {
+        bull: "THỊ TRƯỜNG TĂNG",
+        bear: "THỊ TRƯỜNG GIẢM",
+        stable: "ỔN ĐỊNH"
+    },
+    alerts: {
+        apiKeyRequired: "Vui lòng nhập API Key để bắt đầu!",
+        quotaExceeded: "API Key đã hết hạn mức sử dụng (Quota). Vui lòng kiểm tra billing hoặc nạp thêm credit.",
+        invalidKey: "API Key không hợp lệ.",
+        tooManyRequests: "Yêu cầu quá nhanh hoặc hết hạn mức (429).",
+        officeFull: "Văn phòng đã đầy!",
+        noFundsRecruit: "Không đủ tiền ($500)!",
+        noFundsHire: "Không đủ tiền tuyển dụng!",
+        errorTurn: "Có lỗi khi xử lý lượt chơi. Vui lòng thử lại.",
+        systemError: "Lỗi hệ thống. Vui lòng kiểm tra API Key hoặc kết nối mạng.",
+        bankrupt: "Phá sản (Nợ > $10k).",
+        systemFailure: "Lỗi hệ thống"
+    },
+    history: {
+        investmentDeal: "Thương vụ hoàn tất! {name} đã đầu tư ${amount} cho {equity}% cổ phần.",
+        pitchSecured: "HUY ĐỘNG VỐN THÀNH CÔNG!",
+        pitchRejected: "BỊ TỪ CHỐI.",
+        expandAggressively: "Mở rộng mạnh mẽ.",
+        spendWisely: "Chi tiêu khôn ngoan.",
+        improveStats: "Cải thiện chỉ số và thử lại.",
+        boardAdvice: "Lời khuyên HĐQT: {advice}"
+    },
+    traits: {
+        diligent: "Siêng năng",
+        lazy: "Lười biếng",
+        loyal: "Trung thành",
+        sensitive: "Dễ tự ái",
+        ambitious: "Tham vọng",
+        sociable: "Hòa đồng",
+        eccentric: "Lập dị"
     }
   }
 };

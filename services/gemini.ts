@@ -600,7 +600,8 @@ export const processTurn = async (
   const marketingCost = MARKETING_COSTS[decisions.marketingFocus] || 0;
 
   const prompt = `
-    Week ${gameState.turn}. Stage: ${gameState.stage}.
+    Week ${gameState.turn}. Stage: ${gameState.stage}. 
+    Market Condition: ${gameState.marketCondition}. (BULL = Growth boost, BEAT = Slump, NEUTRAL = Normal).
     
     PRODUCTS & MODULES:
     ${gameState.products.map(p => `
