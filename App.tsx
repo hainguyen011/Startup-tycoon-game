@@ -671,7 +671,7 @@ const GameContainer: React.FC = () => {
                     // Apply AI EmployeeUpdates (Synergy, Health, Events)
                     const eUpdate = result.employeeUpdates?.find(eu => eu.employeeId === updatedE.id);
                     if (eUpdate) {
-                        if (eUpdate.healthChange) updatedE.health = Math.max(0, Math.min(100, updatedE.health + eUpdate.healthChange));
+                        if (eUpdate.healthChange) updatedE.health = Math.max(0, Math.min(100, (updatedE.health || 100) + eUpdate.healthChange));
                         if (eUpdate.stressChange) updatedE.stress = Math.max(0, Math.min(100, updatedE.stress + eUpdate.stressChange));
                         if (eUpdate.reliabilityChange && updatedE.proStats) updatedE.proStats.reliability = Math.max(0, Math.min(100, updatedE.proStats.reliability + eUpdate.reliabilityChange));
                         if (eUpdate.productivityChange && updatedE.proStats) updatedE.proStats.productivity = Math.max(0, Math.min(100, updatedE.proStats.productivity + eUpdate.productivityChange));
@@ -681,6 +681,23 @@ const GameContainer: React.FC = () => {
                         }
                         if (eUpdate.headhuntOffer) {
                             updatedE.headhuntStatus = 'offered';
+                        }
+                    }
+
+                    // --- DETEMINISTIC SYNERGY & HARMONY ---
+                    if (updatedE.assignedProductId) {
+                        const projectTeam = prev.employees.filter(emp => emp.assignedProductId === updatedE.assignedProductId);
+                        
+                        // 1. Mentor & Mentee (Senior/Expert boosts Junior growth)
+                        const hasMentor = projectTeam.some(emp => (emp.level === 'Senior' || emp.level === 'Expert' || emp.level === 'Lead') && emp.id !== updatedE.id);
+                        if (updatedE.level === 'Junior' && hasMentor && updatedE.proStats) {
+                            updatedE.proStats.growthPotential = Math.min(100, updatedE.proStats.growthPotential + 2);
+                        }
+
+                        // 2. Solo Carry Clash (Harmony)
+                        const soloCarries = projectTeam.filter(emp => emp.hiddenTraits?.includes('Solo Carry'));
+                        if (soloCarries.length > 1 && updatedE.hiddenTraits?.includes('Solo Carry')) {
+                            updatedE.stress += 5; // Conflict increases stress
                         }
                     }
 
@@ -714,7 +731,21 @@ const GameContainer: React.FC = () => {
                 // Products
                 const totalUserChange = result.productUpdates.reduce((acc, p) => acc + p.userChange, 0);
                 const newUsers = Math.max(0, prev.users + totalUserChange);
-                let newMorale = Math.min(100, Math.max(0, prev.morale + result.moraleChange));
+                
+                // --- OFFICE CULTURE LOGIC ---
+                let moraleModifier = 0;
+                const toxicCount = prev.employees.filter(e => e.hiddenTraits?.includes('Toxic')).length;
+                const glueCount = prev.employees.filter(e => e.hiddenTraits?.includes('Team Glue')).length;
+                
+                if (toxicCount > glueCount) {
+                    moraleModifier -= 2; // Toxic environment decays morale faster
+                    result.narrative += " " + t('dashboard.infra.toxic');
+                } else if (glueCount > 0) {
+                    moraleModifier += 1; // Team glue helps maintain morale
+                    result.narrative += " " + t('dashboard.infra.harmony');
+                }
+
+                let newMorale = Math.min(100, Math.max(0, prev.morale + result.moraleChange + moraleModifier));
 
                 const updatedProducts = prev.products.map(prod => {
                     const update = result.productUpdates.find(u => u.productId === prod.id);
@@ -753,6 +784,26 @@ const GameContainer: React.FC = () => {
                         activeFeedback: newFeedback
                     };
                 });
+
+                // 3. Infrastructure Breakdown Logic (Random)
+                let breakdownMessages: string[] = [];
+                const updatedFacilities = prev.facilities.map(fac => {
+                    if (fac.level > 1 && Math.random() < 0.03) { // 3% chance of breakdown per turn for upgraded items
+                        const newLevel = fac.level - 1;
+                        const facName = t(`dashboard.infra.${fac.id}.name`) || fac.name;
+                        breakdownMessages.push(t('dashboard.infra.breakdown', { name: facName, level: newLevel.toString() }));
+                        return { 
+                            ...fac, 
+                            level: newLevel,
+                            description: `${t('dashboard.infra.level')} ${newLevel}` // Sync description
+                        };
+                    }
+                    return fac;
+                });
+
+                if (breakdownMessages.length > 0) {
+                    result.narrative += " " + breakdownMessages.join(" ");
+                }
 
                 // Game Over Check
                 let newStage = prev.stage;

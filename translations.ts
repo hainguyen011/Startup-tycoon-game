@@ -352,7 +352,10 @@ export const translations = {
           coffee: {
               name: "Premium Coffee Machine",
               benefit: "Reduces weekly Stress by {value}"
-          }
+          },
+          breakdown: "[BREAKDOWN] {name} has malfunctioned! Level dropped to {level}.",
+          toxic: "[CULTURE] The office vibe feels toxic recently.",
+          harmony: "[CULTURE] Great team harmony today!"
       }
     },
     gameover: {
@@ -763,7 +766,10 @@ export const translations = {
           coffee: {
               name: "Máy Pha Cà Phê Xịn",
               benefit: "Giảm Stress mỗi tuần: -{value}"
-          }
+          },
+          breakdown: "[SỰ CỐ] {name} bị hỏng hóc! Cấp độ giảm xuống {level}.",
+          toxic: "[VĂN HÓA] Không khí văn phòng dạo này khá 'toxic'.",
+          harmony: "[VĂN HÓA] Sự gắn kết đội ngũ thật tuyệt vời!"
       }
     },
     gameover: {
