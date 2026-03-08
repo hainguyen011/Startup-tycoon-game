@@ -70,10 +70,14 @@ export const translations = {
       },
       funding: {
         title: "External Funding",
-        pitch: "Pitch Investors"
+        pitch: "Pitch Investors",
+        seed: "Seed Round ($200k)",
+        seriesA: "Series A ($1M)",
+        seriesB: "Series B ($5M)"
       },
       tabs: {
         overview: "Overview",
+        office: "Office",
         products: "Products",
         report: "Report",
         secretary: "Secretary",
@@ -197,6 +201,9 @@ export const translations = {
         market: "Market Research",
         competitor: "Spy Competitor",
         internal: "Internal Audit",
+        market_report: "Market Report",
+        spy_report: "Spy Report",
+        audit_report: "Internal Audit Report",
         title: "Intel Report",
         briefing: "Top Secret",
         source: "Source",
@@ -206,10 +213,22 @@ export const translations = {
         confidential: "Confidential",
         close: "Close Intelligence"
       },
-
+      stages: {
+        prelaunch: "Pre-Launch",
+        mvp: "MVP",
+        growth: "Growth",
+        scaleup: "Scale-Up",
+        unicorn: "Unicorn",
+        exit: "Exit"
+      },
       contracts: {
         active: "Active Contracts",
         available: "Available Contracts",
+        findNew: "Find New Contracts",
+        weeksLeft: "weeks left",
+        completion: "Completion",
+        assignStaff: "Assign Staff",
+        accept: "Accept Contract",
         reputation: "Corporate Reputation",
         assign: "Assign Staff",
         deadline: "Weeks Left",
@@ -234,11 +253,24 @@ export const translations = {
         investor: "Investor",
         patience: "Patience",
         dealClosed: "DEAL CLOSED",
-        dealFailed: "NEGOTIATION FAILED"
+        dealFailed: "NEGOTIATION FAILED",
+        partner: "PARTNER",
+        rejected: "REJECTED"
       },
       team: {
         manage: "Manage Team",
         recruit: "Recruit",
+        recruitTitle: "Recruit New Talent",
+        rolePlaceholder: "e.g. Senior Backend Developer...",
+        roles: {
+            developer: "Developer",
+            designer: "Designer",
+            marketer: "Marketer",
+            sales: "Sales",
+            manager: "Manager",
+            secretary: "Secretary",
+            tester: "Tester"
+        },
         headhunting: "Headhunting Params",
         roleDesc: "Role Description",
         maxBudget: "Max Budget",
@@ -246,10 +278,38 @@ export const translations = {
         viewProfile: "View Profile",
         wage: "Wage",
         morale: "Morale",
-        skill: "Skill",
+        skill: "Core Skill",
+        coreSkills: {
+            technical: "Technical",
+            creative: "Creative",
+            social: "Social",
+            critical: "Critical"
+        },
+        proStats: {
+            productivity: "Productivity",
+            accuracy: "Accuracy",
+            reliability: "Reliability",
+            growthPotential: "Growth Potential"
+        },
+        hrActions: {
+            checkRef: "Check Reference ($50)",
+            trial: "Hire on Trial (50% pay, 2 weeks)"
+        },
         interviewNotes: "Interview Notes",
         hireNow: "Hire Now",
-        pass: "Pass"
+        pass: "Pass",
+        chat: "Chat",
+        fire: "Fire",
+        ask: "Expected",
+        statuses: {
+            coding_backend: "💻 Backend Dev",
+            designing_ui: "🎨 Designing UI",
+            querying_db: "🗄️ Querying DB",
+            contract_work: "📑 Contract Work",
+            coffee_time: "☕ Coffee Break",
+            burnout: "🤯 Burnout!",
+            idle: "💤 Idle"
+        }
       },
       founder: {
           skills: {
@@ -260,7 +320,9 @@ export const translations = {
           interests: "Personal Interests",
           noInterests: "No interests listed",
           narrative: "Founder Narrative",
-          role: "Chief Executive Officer"
+          role: "Chief Executive Officer",
+          title: "Chief Executive Officer",
+          bioTemplate: "As the founder of {company}, {name} brings a vision to disrupt the {industry} industry. With a passion for {interests}, the goal is to build a sustainable unicorn empire."
       },
       council: {
           title: "The Council",
@@ -269,7 +331,28 @@ export const translations = {
       },
       infra: {
           maxed: "Maxed Out",
-          upgrade: "Upgrade"
+          upgrade: "Upgrade",
+          level: "Level",
+          office: {
+              name: "Home Office / Garage",
+              benefit: "Capacity: {value} Employees"
+          },
+          server: {
+              name: "Shared Servers",
+              benefit: "Capacity: {value} Users"
+          },
+          pc: {
+              name: "High-end Workstations",
+              benefit: "Boosts Productivity by {value}%"
+          },
+          chair: {
+              name: "Ergonomic Chairs",
+              benefit: "Boosts Reliability by {value}%"
+          },
+          coffee: {
+              name: "Premium Coffee Machine",
+              benefit: "Reduces weekly Stress by {value}"
+          }
       }
     },
     gameover: {
@@ -314,7 +397,19 @@ export const translations = {
         sensitive: "Sensitive",
         ambitious: "Ambitious",
         sociable: "Sociable",
-        eccentric: "Eccentric"
+        eccentric: "Eccentric",
+        // Gen Z Vibe
+        fastLearner: "Fast Learner",
+        bugCrusher: "Bug Crusher",
+        ideaMachine: "Idea Machine",
+        soloCarry: "Solo Carry",
+        teamGlue: "Team Glue",
+        toxic: "Toxic",
+        burnoutProne: "Burnout Prone",
+        codeCowboy: "Code Cowboy",
+        quietQuitter: "Quiet Quitter",
+        dramaKing: "Drama King/Queen",
+        meetingLover: "Meeting Lover"
     }
   },
   vi: {
@@ -385,16 +480,20 @@ export const translations = {
       },
       funding: {
         title: "Huy động vốn bên ngoài",
-        pitch: "Thuyết phục nhà đầu tư"
+        pitch: "Thuyết phục nhà đầu tư",
+        seed: "Vòng hạt giống ($200k)",
+        seriesA: "Vòng Series A ($1M)",
+        seriesB: "Vòng Series B ($5M)"
       },
       tabs: {
         overview: "Tổng quan",
+        office: "Văn phòng",
         products: "Sản phẩm",
         report: "Báo cáo",
         secretary: "Thư ký",
         team: "Nhân sự",
         infra: "Hạ tầng",
-        founder: "Founder",
+        founder: "Nhà sáng lập",
         contracts: "Hợp đồng",
         investment: "Đầu tư",
         council: "Hội đồng AI"
@@ -512,6 +611,9 @@ export const translations = {
         market: "Nghiên cứu thị trường",
         competitor: "Do thám đối thủ",
         internal: "Kiểm toán nội bộ",
+        market_report: "Báo cáo thị trường",
+        spy_report: "Báo cáo tình báo",
+        audit_report: "Báo cáo kiểm toán",
         title: "Báo cáo tình báo",
         briefing: "Tối mật",
         source: "Nguồn",
@@ -525,6 +627,11 @@ export const translations = {
       contracts: {
         active: "Hợp đồng đang chạy",
         available: "Hợp đồng khả dụng",
+        findNew: "Tìm hợp đồng mới",
+        weeksLeft: "tuần còn lại",
+        completion: "Hoàn thành",
+        assignStaff: "Gán nhân sự",
+        accept: "Chấp nhận hợp đồng",
         reputation: "Uy tín doanh nghiệp",
         assign: "Gán nhân sự",
         deadline: "Tuần còn lại",
@@ -549,11 +656,24 @@ export const translations = {
         investor: "Nhà đầu tư",
         patience: "Sự kiên nhẫn",
         dealClosed: "THƯƠNG VỤ HOÀN TẤT",
-        dealFailed: "ĐÀM PHÁN THẤT BẠI"
+        dealFailed: "ĐÀM PHÁN THẤT BẠI",
+        partner: "ĐỐI TÁC",
+        rejected: "BỊ TỪ CHỐI"
       },
       team: {
         manage: "Quản lý nhân sự",
         recruit: "Tuyển dụng",
+        recruitTitle: "Tuyển dụng nhân tài",
+        rolePlaceholder: "VD: Lập trình viên Backend...",
+        roles: {
+            developer: "Lập trình viên",
+            designer: "Thiết kế",
+            marketer: "Marketing",
+            sales: "Kinh doanh",
+            manager: "Quản lý",
+            secretary: "Thư ký",
+            tester: "Kiểm thử"
+        },
         headhunting: "Thông số tuyển dụng",
         roleDesc: "Mô tả vị trí",
         maxBudget: "Ngân sách tối đa",
@@ -561,10 +681,38 @@ export const translations = {
         viewProfile: "Xem hồ sơ",
         wage: "Lương",
         morale: "Tinh thần",
-        skill: "Kỹ năng",
+        skill: "Kỹ năng chính",
+        coreSkills: {
+            technical: "Thực thi (Tech)",
+            creative: "Sáng tạo",
+            social: "Giao tiếp",
+            critical: "Tư duy"
+        },
+        proStats: {
+            productivity: "Năng suất (⚡)",
+            accuracy: "Độ chính xác (🎯)",
+            reliability: "Độ tin cậy (🛡️)",
+            growthPotential: "Tiềm năng (🌱)"
+        },
+        hrActions: {
+            checkRef: "Check Var sếp cũ ($50)",
+            trial: "Thử việc (2 tuần, lương 50%)"
+        },
         interviewNotes: "Ghi chú phỏng vấn",
         hireNow: "Tuyển ngay",
-        pass: "Bỏ qua"
+        pass: "Bỏ qua",
+        chat: "Trò chuyện",
+        fire: "Sa thải",
+        ask: "Lương đề nghị",
+        statuses: {
+            coding_backend: "💻 Lập trình Hệ thống",
+            designing_ui: "🎨 Thiết kế Giao diện",
+            querying_db: "🗄️ Tối ưu Dữ liệu",
+            contract_work: "📑 Giải quyết Hợp đồng",
+            coffee_time: "☕ Giờ Cà phê",
+            burnout: "🤯 Kiệt sức!",
+            idle: "💤 Đang chờ"
+        }
       },
       founder: {
           skills: {
@@ -575,7 +723,17 @@ export const translations = {
           interests: "Sở thích cá nhân",
           noInterests: "Chưa liệt kê sở thích",
           narrative: "Tiểu sử Founder",
-          role: "Giám đốc điều hành"
+          role: "Giám đốc điều hành",
+          title: "Giám đốc điều hành (CEO)",
+          bioTemplate: "Là người sáng lập {company}, {name} mang theo tầm nhìn thay đổi ngành {industry}. Với đam mê dành cho {interests}, mục tiêu là xây dựng một đế chế kỳ lân bền vững."
+      },
+      stages: {
+        prelaunch: "Sơ khai",
+        mvp: "MVP",
+        growth: "Tăng trưởng",
+        scaleup: "Mở rộng",
+        unicorn: "Kỳ lân",
+        exit: "Thoái vốn"
       },
       council: {
           title: "Hội đồng AI",
@@ -584,7 +742,28 @@ export const translations = {
       },
       infra: {
           maxed: "Cấp tối đa",
-          upgrade: "Nâng cấp"
+          upgrade: "Nâng cấp",
+          level: "Cấp",
+          office: {
+              name: "Văn phòng tại gia / Garage",
+              benefit: "Sức chứa: {value} nhân viên"
+          },
+          server: {
+              name: "Máy chủ dùng chung",
+              benefit: "Sức chứa: {value} người dùng"
+          },
+          pc: {
+              name: "Dàn PC Khủng",
+              benefit: "Tăng Năng suất (Productivity): +{value}%"
+          },
+          chair: {
+              name: "Ghế Công Thái Học",
+              benefit: "Tăng Độ Ổn định (Reliability): +{value}%"
+          },
+          coffee: {
+              name: "Máy Pha Cà Phê Xịn",
+              benefit: "Giảm Stress mỗi tuần: -{value}"
+          }
       }
     },
     gameover: {
@@ -629,7 +808,18 @@ export const translations = {
         sensitive: "Dễ tự ái",
         ambitious: "Tham vọng",
         sociable: "Hòa đồng",
-        eccentric: "Lập dị"
+        eccentric: "Lập dị",
+        fastLearner: "Biết tuốt mảng mới",
+        bugCrusher: "Hủy diệt Bug",
+        ideaMachine: "Máy đẻ Idea",
+        soloCarry: "Gánh team còng lưng",
+        teamGlue: "Đá tảng kết nối",
+        toxic: "Mỏ hỗn / Mỏ hỗn",
+        burnoutProne: "Chúa tể suy",
+        codeCowboy: "Múa phím rớt não",
+        quietQuitter: "Làm đủ ăn rồi cút",
+        dramaKing: "Chiến thần hít Drama",
+        meetingLover: "Tôn vương Họp hành"
     }
   }
 };

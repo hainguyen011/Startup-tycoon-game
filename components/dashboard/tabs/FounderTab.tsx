@@ -29,7 +29,7 @@ export const FounderTab: React.FC<FounderTabProps> = ({ state }) => {
                     )}
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-1">{state.ceo.name}</h2>
-                <div className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest mb-4">Chief Executive Officer</div>
+                <div className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest mb-4">{t('dashboard.founder.title')}</div>
                 
                 <div className="flex gap-2 mt-2">
                     <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-500 transition-colors cursor-pointer"><TrendingUp size={18}/></div>
@@ -72,10 +72,12 @@ export const FounderTab: React.FC<FounderTabProps> = ({ state }) => {
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('dashboard.tabs.founder')}</h4>
                      <p className="text-slate-600 leading-relaxed text-sm italic">
-                         {language === 'vi' 
-                           ? `Là người sáng lập ${state.companyName}, ${state.ceo.name} mang theo tầm nhìn thay đổi ngành ${state.industry}. Với đam mê dành cho ${state.ceo.interests.slice(0, 2).join(' và ')}, mục tiêu là xây dựng một đế chế kỳ lân bền vững.`
-                           : `As the founder of ${state.companyName}, ${state.ceo.name} brings a vision to disrupt the ${state.industry} industry. With a passion for ${state.ceo.interests.slice(0, 2).join(' and ')}, the goal is to build a sustainable unicorn empire.`
-                         }
+                         {t('dashboard.founder.bioTemplate', { 
+                             company: state.companyName, 
+                             name: state.ceo.name, 
+                             industry: state.industry, 
+                             interests: state.ceo.interests.slice(0, 2).join(language === 'vi' ? ' và ' : ' and ') 
+                         })}
                      </p>
                 </div>
             </div>

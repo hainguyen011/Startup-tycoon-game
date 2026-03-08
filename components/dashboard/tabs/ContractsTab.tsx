@@ -1,6 +1,7 @@
 import React from 'react';
 import { GameState } from '../../../types';
 import Button from '../../Button';
+import CustomSelect from '../../CustomSelect';
 import { Search, Activity, X, Briefcase as BriefcaseIcon } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 
@@ -42,10 +43,16 @@ export const ContractsTab: React.FC<ContractsTabProps> = ({ state, onFindContrac
                         </div>
                         <div className="flex items-center justify-between pt-4 border-t border-slate-100 gap-4">
                              <div className="text-xs font-bold text-slate-400 uppercase shrink-0">{t('dashboard.tabs.team')}</div>
-                             <select className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-700 outline-none" onChange={(e) => onAssignEmployee(e.target.value, c.id)} value="">
-                                 <option value="">+ {t('dashboard.contracts.assignStaff')}</option>
-                                 {state.employees.filter(e => !e.assignedContractId && !e.assignedProductId).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                             </select>
+                             <CustomSelect 
+                                 className="flex-1"
+                                 placeholder={`+ ${t('dashboard.contracts.assignStaff')}`}
+                                 value=""
+                                 onChange={(val) => onAssignEmployee(val, c.id)}
+                                 options={state.employees
+                                     .filter(e => !e.assignedContractId && !e.assignedProductId)
+                                     .map(e => ({ id: e.id, name: e.name, badge: e.skill.toString() }))
+                                 }
+                             />
                         </div>
                         <div className="flex flex-wrap gap-2 mt-3">
                             {state.employees.filter(e => e.assignedContractId === c.id).map(e => (

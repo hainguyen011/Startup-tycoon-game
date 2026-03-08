@@ -50,32 +50,56 @@ export interface IntelItem {
 
 // --- NEW TYPES FOR ADVANCED MANAGEMENT ---
 
+export interface EmployeeSkills {
+  technical: number; // 0-100
+  creative: number;  // 0-100
+  social: number;    // 0-100
+  critical: number;  // 0-100
+}
+
+export interface EmployeeProStats {
+  productivity: number; // 0-100. Năng suất
+  accuracy: number;     // 0-100. Độ chính xác (giảm bug)
+  reliability: number;  // 0-100. Khả năng giữ phong độ
+  growthPotential: number; // 0-100. Tiềm năng học hỏi
+}
+
 export interface Employee {
   id: string;
   name: string;
   role: 'Developer' | 'Designer' | 'Marketer' | 'Sales' | 'Manager' | 'Secretary' | 'Tester';
   level: 'Junior' | 'Senior' | 'Lead' | 'Expert';
-  skill: number; // 0-100
+  
+  // NEW: Multi-dimensional skills & stats
+  skills: EmployeeSkills;
+  proStats: EmployeeProStats;
   specificSkills: string[];
+  
   salary: number;
-  morale: number;
+  morale: number; // 0-100
+  health: number; // 0-100 (New for Hyper-Realism)
+  stress: number; // 0-100
+  loyalty: number; // 0-100
+  
+  // NEW: Gen Z / Realism Vibe
   quirk?: string;
   education?: string;
   backgroundStory?: string;
+  hiddenTraits: string[]; // Vd: 'Fast Learner', 'Toxic', 'Bug Crusher'
+  headhuntStatus: 'none' | 'offered' | 'considering' | 'leaving';
+  isOnLeave: boolean;
+  leaveTurnsLeft: number;
+  trialTurnsLeft?: number; // >0 means still on trial
+  
+  assignedProductId?: string | null;
+  assignedContractId?: string | null;
 
-  // Stats
-  stress: number;
-  loyalty: number;
-  traits: string[];
-  assignedProductId?: string | null; // Link to a product
-  assignedContractId?: string | null; // Link to a contract
-
-  // Big Update 1.0 - 3D Office & Culture
+  // 3D Office & Culture
   personality?: string;
   position3D?: [number, number, number];
 
-  // Status & Assignments (Used by Office Engine)
-  status?: 'idle' | 'working' | 'resting';
+  // Status & Assignments
+  status?: 'idle' | 'working' | 'resting' | 'on_leave';
   assignedTo?: {
     type: 'product' | 'contract' | 'training';
     productId?: string;
@@ -89,16 +113,24 @@ export interface Candidate {
   name: string;
   role: 'Developer' | 'Designer' | 'Marketer' | 'Sales' | 'Manager' | 'Secretary' | 'Tester';
   level: 'Junior' | 'Senior' | 'Lead' | 'Expert';
-  skill: number;
+  
+  skills: EmployeeSkills;
+  proStats: EmployeeProStats;
   specificSkills: string[];
+  
   salary: number;
+  expectedSalary: number; // New for negotiation
   bio: string;
-  matchAnalysis: string;
   quirk: string;
   hireCost: number;
   education: string;
   experienceYears: number;
-  interviewNotes: string;
+  interviewNotes: string; // Hints about hidden traits
+  
+  // HR Gameplay
+  hiddenTraits: string[];
+  revealedTraits: string[]; // Traits discovered via Check Reference
+  isReferenceChecked: boolean;
 }
 
 export enum ProductStage {
@@ -113,9 +145,11 @@ export enum ProductStage {
 export interface ProductModule {
   id: string;
   name: string;
-  requiredSkill: string;
+  requiredCoreSkill: 'technical' | 'creative' | 'social' | 'critical'; // Ràng buộc Kỹ năng chính
+  minProStat?: { stat: 'productivity' | 'accuracy' | 'reliability' | 'growthPotential'; value: number }; // Ràng buộc Pro Stat
   progress: number;
   quality: number;
+  bugs: number; // Tracking bugs per module
   assignedEmployeeId: string | null;
 }
 
@@ -186,7 +220,7 @@ export interface Facility {
   costToUpgrade: number;
   maintenanceCost: number;
   benefit: string;
-  statEffect: 'max_employees' | 'max_users' | 'efficiency';
+  statEffect: 'max_employees' | 'max_users' | 'efficiency' | 'productivity_boost' | 'reliability_boost' | 'stress_reduction'; // Thêm hiệu ứng thực tế
   value: number;
 }
 
@@ -279,6 +313,18 @@ export interface SimulationResult {
     status: 'progress' | 'completed' | 'failed';
     message: string;
   }[];
+
+  // NEW: Thêm mảng update cho từng nhân viên từ AI (Synergy, Life Events, Headhunt)
+  employeeUpdates?: {
+      employeeId: string;
+      healthChange?: number;
+      stressChange?: number;
+      reliabilityChange?: number;
+      productivityChange?: number;
+      headhuntOffer?: boolean;
+      lifeEvent?: string; // e.g: "Sick leave", "Family emergency"
+      leaveTurns?: number;
+  }[];
 }
 
 export interface GameState {
@@ -318,7 +364,7 @@ export interface InitialGameStoryResponse {
   initialProductAnalysis: string;
 }
 
-export const INITIAL_CASH = 10000;
+export const INITIAL_CASH = 50000;
 
 // Defined explicitly to be shared between UI and Logic if needed
 export const MARKETING_COSTS: Record<string, number> = {
@@ -353,6 +399,42 @@ export const INITIAL_FACILITIES: Facility[] = [
     benefit: 'Max 1,000 Users',
     statEffect: 'max_users',
     value: 1000
+  },
+  {
+    id: 'pc',
+    name: 'Standard Laptop',
+    level: 1,
+    maxLevel: 5,
+    description: 'Developer PC',
+    costToUpgrade: 1000,
+    maintenanceCost: 20,
+    benefit: 'PC Productivity',
+    statEffect: 'productivity_boost',
+    value: 0
+  },
+  {
+    id: 'chair',
+    name: 'Plastic Chair',
+    level: 1,
+    maxLevel: 5,
+    description: 'Ergonomic Chair',
+    costToUpgrade: 500,
+    maintenanceCost: 10,
+    benefit: 'Chair Reliability',
+    statEffect: 'reliability_boost',
+    value: 0
+  },
+  {
+    id: 'coffee',
+    name: 'Instant Coffee',
+    level: 1,
+    maxLevel: 5,
+    description: 'Coffee Machine',
+    costToUpgrade: 800,
+    maintenanceCost: 15,
+    benefit: 'Coffee Stress Reduction',
+    statEffect: 'stress_reduction',
+    value: 0
   }
 ];
 

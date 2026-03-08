@@ -37,8 +37,8 @@ export const InvestmentTab: React.FC<InvestmentTabProps> = ({ state, onAskAdvice
                     <div className="text-4xl md:text-5xl font-heading font-bold text-white tracking-tight">${(totalRevenue * 12 * 5 || 10000).toLocaleString()}</div>
                 </div>
                 <div className="flex gap-3">
-                    <Button onClick={onAskAdvice} className="bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur-md">{t('dashboard.investment.boardAdvice')}</Button>
-                    <Button onClick={onFindInvestor} disabled={isProcessing} className="bg-white text-black hover:bg-slate-100 border-none shadow-lg">{t('dashboard.investment.findInvestors')}</Button>
+                    <Button onClick={onAskAdvice} className="bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur-md">{t('dashboard.actions.boardAdvice')}</Button>
+                    <Button onClick={onFindInvestor} disabled={isProcessing} className="bg-white text-black hover:bg-slate-100 border-none shadow-lg">{t('dashboard.actions.findInvestors')}</Button>
                 </div>
             </div>
         </div>
@@ -100,7 +100,7 @@ export const InvestmentTab: React.FC<InvestmentTabProps> = ({ state, onAskAdvice
                      <div className="p-5 bg-white border-t border-slate-200 shrink-0">
                          {activeNegotiation.status === 'negotiating' || activeNegotiation.status === 'new' ? (
                              <div className="flex gap-3">
-                                 <input className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder={t('dashboard.investment.negotiationPlaceholder')} value={negotiationMessage} onChange={(e) => setNegotiationMessage(e.target.value)} />
+                                 <input className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder={t('dashboard.investment.chatPlaceholder')} value={negotiationMessage} onChange={(e) => setNegotiationMessage(e.target.value)} />
                                  <Button onClick={handleNegotiationSubmit} disabled={isProcessing || !negotiationMessage} className="px-5 shadow-lg shadow-blue-200"><Send size={18}/></Button>
                              </div>
                          ) : (

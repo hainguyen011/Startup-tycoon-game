@@ -437,17 +437,19 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
       
       NAMING & PERSONALITY (CRITICAL):
       - Names should be realistic for ${language === 'vi' ? 'Vietnam' : 'International context'} but with a touch of wit or memorability.
-      - Examples (VI): "Nam 'Bug-Hunter' Trần", "Linh 'Pixel' Nguyễn", "Hoàng 'Data-God' Lê".
+      - Examples (VI): "Nam 'Bug-Hunter' Trần", "Linh 'Deadline-Dancer' Hoàng", "Minh 'Git-Fail' Phạm".
       - Examples (EN): "Sam 'Legacy-Code' Smith", "Sarah 'Vector' Jones", "Mike 'Deadline' Miller".
-      - Trait/Quirk should be funny and startup-related (e.g., "Only codes during full moons", "Can talk to printers", "Believes Jira is a religion").
+      - Trait/Quirk should be funny and startup-related.
       
-      CRITICAL SALARY RULES:
-      - You must generate candidates whose salary expectations are close to $${budget} (±20%).
-      - THE SKILL MUST MATCH THE SALARY.
-      - If Salary < 1000: Candidate is Junior/Intern. Skill MUST be 20-40.
-      - If Salary 1000-2500: Candidate is Mid-Level. Skill MUST be 40-70.
-      - If Salary 2500-4500: Candidate is Senior. Skill MUST be 70-85.
-      - If Salary > 4500: Candidate is Expert/Lead. Skill MUST be 85-100.
+      CRITICAL SKILLS & STATS RULES:
+      - Core Skills (technical, creative, social, critical): 0-100.
+      - Pro Stats (productivity, accuracy, reliability, growthPotential): 0-100.
+      - Expected Salary should be close to $${budget} (±20%).
+      - IF Salary < 1000: Junior. Average stats 20-40. High growthPotential.
+      - IF Salary 1000-2500: Mid-Level. Average stats 40-70.
+      - IF Salary 2500-4500: Senior. Average stats 70-85.
+      - IF Salary > 4500: Expert. Average stats 85-100.
+      - interviewNotes should HINT at their hidden traits (e.g., if trait is 'Toxic', note might say "A bit arrogant during technical questions.").
       
       Create 3 detailed candidate CVs adhering to these rules. All text must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}.
       
@@ -466,21 +468,40 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
                         name: { type: Type.STRING },
                         role: { type: Type.STRING, enum: ['Developer', 'Designer', 'Marketer', 'Sales', 'Manager', 'Secretary', 'Tester'] },
                         level: { type: Type.STRING, enum: ['Junior', 'Senior', 'Lead', 'Expert'] },
-                        skill: { type: Type.INTEGER },
+                        skills: {
+                            type: Type.OBJECT,
+                            properties: {
+                                technical: { type: Type.INTEGER },
+                                creative: { type: Type.INTEGER },
+                                social: { type: Type.INTEGER },
+                                critical: { type: Type.INTEGER }
+                            },
+                            required: ['technical', 'creative', 'social', 'critical']
+                        },
+                        proStats: {
+                           type: Type.OBJECT,
+                           properties: {
+                               productivity: { type: Type.INTEGER },
+                               accuracy: { type: Type.INTEGER },
+                               reliability: { type: Type.INTEGER },
+                               growthPotential: { type: Type.INTEGER }
+                           },
+                           required: ['productivity', 'accuracy', 'reliability', 'growthPotential']
+                        },
+                        hiddenTraits: { type: Type.ARRAY, items: { type: Type.STRING } },
                         specificSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        salary: { type: Type.INTEGER },
+                        expectedSalary: { type: Type.INTEGER },
                         hireCost: { type: Type.INTEGER },
                         bio: { type: Type.STRING },
-                        matchAnalysis: { type: Type.STRING },
                         quirk: { type: Type.STRING },
                         education: { type: Type.STRING },
                         experienceYears: { type: Type.INTEGER },
                         interviewNotes: { type: Type.STRING }
                     },
-                    required: ['name', 'role', 'level', 'skill', 'specificSkills', 'salary', 'hireCost', 'bio', 'matchAnalysis', 'quirk', 'education', 'experienceYears', 'interviewNotes']
+                    required: ['name', 'role', 'level', 'skills', 'proStats', 'hiddenTraits', 'specificSkills', 'expectedSalary', 'hireCost', 'bio', 'quirk', 'education', 'experienceYears', 'interviewNotes']
                 }
             },
-            jsonKeys: ['name', 'role', 'level', 'skill', 'salary', 'hireCost', 'bio']
+            jsonKeys: ['name', 'role', 'level', 'skills', 'proStats', 'expectedSalary', 'hireCost', 'bio']
         }));
 
         if (!Array.isArray(candidates)) return [];
@@ -488,6 +509,9 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
         return candidates.map((c: any, index: number) => ({
             ...c,
             id: `cand-${Date.now()}-${index}`,
+            salary: c.expectedSalary, // Default to expected, player can negotiate later if implemented
+            revealedTraits: [],
+            isReferenceChecked: false,
             education: c.education || "Self-taught",
             experienceYears: c.experienceYears !== undefined ? c.experienceYears : 1,
             interviewNotes: c.interviewNotes || "Candidate seemed eager."
@@ -495,21 +519,25 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
 
     } catch (error) {
         // Fallback based on budget
-        const fallbackSkill = budget < 1000 ? 35 : budget > 3000 ? 85 : 55;
         const fallbackLevel = budget < 1000 ? 'Junior' : budget > 3000 ? 'Senior' : 'Junior';
+        const fallbackValue = budget < 1000 ? 35 : budget > 3000 ? 85 : 55;
 
         return [
             {
                 id: `fallback-1`,
-                name: "Dev Dave",
+                name: "Dev Dave 'Fallback'",
                 role: 'Developer',
                 level: fallbackLevel,
-                skill: fallbackSkill,
+                skills: { technical: fallbackValue, creative: fallbackValue, social: 30, critical: 40 },
+                proStats: { productivity: fallbackValue, accuracy: fallbackValue, reliability: 50, growthPotential: 80 },
                 specificSkills: ['HTML', 'CSS'],
                 salary: Math.floor(budget * 0.9),
+                expectedSalary: Math.floor(budget * 0.9),
+                hiddenTraits: ['Team Player'],
+                revealedTraits: [],
+                isReferenceChecked: false,
                 hireCost: 300,
-                bio: "Fallback candidate.",
-                matchAnalysis: "Matches budget.",
+                bio: "Fallback candidate. Servers are busy.",
                 quirk: "Codes with 1 hand.",
                 education: "Online Course",
                 experienceYears: 1,
@@ -593,7 +621,7 @@ export const processTurn = async (
     // Prepare Product Context
     const productsContext = gameState.products.map(p => {
         const team = gameState.employees.filter(e => e.assignedProductId === p.id);
-        const devPower = team.filter(e => e.role === 'Developer').reduce((sum, e) => sum + e.skill, 0);
+        const devPower = team.filter(e => e.role === 'Developer').reduce((sum, e) => sum + (e.skills?.technical || 0), 0);
         return {
             id: p.id,
             name: p.name,
@@ -609,12 +637,15 @@ export const processTurn = async (
     Week ${gameState.turn}. Stage: ${gameState.stage}. 
     Market Condition: ${gameState.marketCondition}. (BULL = Growth boost, BEAT = Slump, NEUTRAL = Normal).
     
+    FACILITIES & PERKS (Passive Buffs):
+    ${gameState.facilities.filter(f => f.level > 1).map(f => `- ${f.name} (Lvl ${f.level}): ${f.benefit}`).join('\n')}
+
     PRODUCTS & MODULES:
     ${gameState.products.map(p => `
       Product: ${p.name} (${p.stage})
       Stats: Quality ${p.quality}, Bugs ${p.bugs}, TechDebt ${p.techDebt}/100
-      Modules: ${p.modules.map(m => `- ${m.name} (Req: ${m.requiredSkill}, Progress: ${m.progress}%, Assigned: ${m.assignedEmployeeId || 'None'})`).join('\n')}
-      Assigned Team: ${gameState.employees.filter(e => e.assignedProductId === p.id).map(e => `${e.name} (${e.role}, Skill ${e.skill}, Specific: ${e.specificSkills.join(', ')})`).join(', ')}
+      Modules: ${p.modules.map(m => `- ${m.name} (Req: ${m.requiredCoreSkill}, Progress: ${m.progress}%, Assigned: ${m.assignedEmployeeId || 'None'})`).join('\n')}
+      Assigned Team: ${gameState.employees.filter(e => e.assignedProductId === p.id).map(e => `${e.name} (${e.role}, Skills: [T:${e.skills?.technical} C:${e.skills?.creative} S:${e.skills?.social} Cr:${e.skills?.critical}], ProStats: [Prod:${e.proStats?.productivity} Acc:${e.proStats?.accuracy} Rel:${e.proStats?.reliability} Gro:${e.proStats?.growthPotential}], Traits: ${e.hiddenTraits?.join('|')})`).join(', ')}
     `).join('\n')}
     
     MANAGEMENT DECISIONS:
@@ -625,18 +656,23 @@ export const processTurn = async (
     - Strategy Note: ${decisions.strategyNote}
     
     SIMULATION RULES:
-    1. PROGRESS: Progress on modules depends on MATCH between employee's specificSkills and module's requiredSkill. 
-       - Mismatch = 50% penalty. 
-       - Crunch Mode = +50% progress but +10 Tech Debt and high Stress.
-       - Leisure Mode = -30% progress but -10 Stress and +Skill XP.
-    2. TECH DEBT: Accumulates if progress is too fast or team is unskilled. High Tech Debt ( > 60) reduces weekly progress and quality.
-    3. REVENUE: Decreases as Tech Debt increases. Unfixed bugs also hurt user growth.
-    4. STRESS & MORALE: Welfare Level affects Stress recovery. 
+    1. PROGRESS & PRO STATS: Progress depends on specific skills AND Pro Stats (Productivity, Accuracy).
+       - Accuracy directly counters Bugs. Reliability counters Tech Debt.
+       - Crunch Mode = +50% progress but high Tech Debt, high Stress, and -Health.
+       - Leisure Mode = -30% progress but -Stress, +Health, +Skill XP.
+    2. SYNERGY ENGINE (Team Dynamics):
+       - Mentoring (Expert/Senior + Junior on same product) boosts Junior's stats.
+       - Clashing Traits (e.g., multiple "Solo Carry") reduce team productivity and morale.
+    3. HYPER-REALISM (Life Events & Headhunting):
+       - Randomly trigger Life Events (e.g., "Sick leave", "Family emergency") -> sets leaveTurns: 1-2.
+       - High skill, low loyalty employees might get headhuntOffer: true.
+       - If Health drops < 30, force Sick Leave.
+    4. GENERAL: Tech Debt > 60 reduces weekly progress. Bugs hurt growth.
     
-    OUTPUT: Calculate changes carefully based on these complex interactions.
+    OUTPUT: Provide detailed updates, including \`employeeUpdates\` for specific changes to individuals (health, stress, life events, headhunting).
     Return JSON.
     
-    CRITICAL: All narrative and report text must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}. Do not mix languages.
+    CRITICAL: All narrative, feedback, and reports must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}. Do not mix languages.
   `;
 
     const schema = {
@@ -655,10 +691,10 @@ export const processTurn = async (
                         devProgressChange: { type: Type.INTEGER },
                         qualityChange: { type: Type.INTEGER },
                         bugChange: { type: Type.INTEGER },
-                        techDebtChange: { type: Type.INTEGER }, // New
+                        techDebtChange: { type: Type.INTEGER },
                         userChange: { type: Type.INTEGER },
                         revenueChange: { type: Type.INTEGER },
-                        moduleUpdates: { // New
+                        moduleUpdates: {
                             type: Type.ARRAY,
                             items: {
                                 type: Type.OBJECT,
@@ -672,6 +708,23 @@ export const processTurn = async (
                         newFeedback: { type: Type.STRING, nullable: true }
                     },
                     required: ["productId", "devProgressChange", "qualityChange", "bugChange", "techDebtChange", "userChange", "revenueChange"]
+                }
+            },
+            employeeUpdates: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        employeeId: { type: Type.STRING },
+                        healthChange: { type: Type.INTEGER },
+                        stressChange: { type: Type.INTEGER },
+                        reliabilityChange: { type: Type.INTEGER },
+                        productivityChange: { type: Type.INTEGER },
+                        headhuntOffer: { type: Type.BOOLEAN },
+                        lifeEvent: { type: Type.STRING },
+                        leaveTurns: { type: Type.INTEGER }
+                    },
+                    required: ["employeeId"]
                 }
             },
             secretaryReport: { type: Type.STRING, nullable: true },

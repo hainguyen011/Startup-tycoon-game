@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GameState } from '../../../types';
 import Button from '../../Button';
+import CustomSelect from '../../CustomSelect';
 import { Rocket, ShieldAlert, Package } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 
@@ -47,8 +48,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ state, onCreateProduct
 
         <div className="grid grid-cols-1 gap-5">
             {state.products.map(p => (
-                <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-500 to-indigo-600"></div>
+                <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 relative group">
                     <div className="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6 pl-4">
                         <div>
                             <h3 className="text-2xl font-bold text-slate-900 leading-tight">{p.name}</h3>
@@ -87,26 +87,38 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ state, onCreateProduct
                             {p.modules.map(mod => {
                                 const assignedEmp = state.employees.find(e => e.id === mod.assignedEmployeeId);
                                 return (
-                                    <div key={mod.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 relative overflow-hidden">
+                                    <div key={mod.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 relative ">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="font-bold text-sm text-slate-800">{mod.name}</div>
-                                            <div className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded uppercase">{mod.requiredSkill}</div>
+                                            <div className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded uppercase">{t(`dashboard.team.coreSkills.${mod.requiredCoreSkill}`)}</div>
                                         </div>
                                         <div className="mb-3">
                                             <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1"><span>{t('dashboard.products.devProgress')}</span><span>{mod.progress}%</span></div>
-                                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${mod.progress}%`}}></div></div>
+                                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width: `${mod.progress}%`}}></div></div>
                                         </div>
                                         
-                                        <select 
-                                            className="w-full text-[10px] bg-white border border-slate-200 rounded-lg p-1.5 font-bold text-slate-700 outline-none"
-                                            onChange={(e) => onAssignToModule(e.target.value, p.id, mod.id)}
+                                        <CustomSelect 
                                             value={mod.assignedEmployeeId || ""}
-                                        >
-                                            <option value="">Unassigned</option>
-                                            {state.employees.filter(e => e.assignedProductId === p.id).map(e => (
-                                                <option key={e.id} value={e.id}>{e.name} ({e.skill})</option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => onAssignToModule(val, p.id, mod.id)}
+                                            options={[
+                                                { id: "", name: t('common.unassigned') },
+                                                ...state.employees.filter(e => !e.assignedContractId).map(e => {
+                                                    const skillVal = e.skills ? e.skills[mod.requiredCoreSkill] : 0;
+                                                    const isLowSkill = skillVal < 40;
+                                                    const prodWarning = e.assignedProductId && e.assignedProductId !== p.id 
+                                                        ? `(Busy on ${state.products.find(prod => prod.id === e.assignedProductId)?.name})` 
+                                                        : '';
+                                                    const skillWarning = isLowSkill ? '⚠️ Low Skill' : '';
+
+                                                    return {
+                                                        id: e.id,
+                                                        name: e.name,
+                                                        badge: skillVal.toString(),
+                                                        description: `${e.level} ${e.role} ${prodWarning} ${skillWarning}`.trim()
+                                                    };
+                                                })
+                                            ]}
+                                        />
                                     </div>
                                 );
                             })}

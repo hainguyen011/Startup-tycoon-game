@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Industry, LLMProvider } from '../types';
 import Button from './Button';
+import CustomSelect from './CustomSelect';
 import { Rocket, Briefcase, Cpu, Heart, ShoppingBag, GraduationCap, Lightbulb, Key, Globe, AlertTriangle, Settings, ChevronDown, User, Box } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { getLLMConfig } from '../services/gemini';
@@ -232,16 +233,12 @@ const SetupGame: React.FC<SetupGameProps> = ({ onStart, isLoading, error }) => {
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                  <div className="relative">
-                      <select 
-                          value={provider} 
-                          onChange={(e) => setProvider(e.target.value as LLMProvider)}
-                          className="w-full bg-white border border-slate-200 text-slate-900 rounded-lg px-3 py-2 text-sm font-medium appearance-none outline-none focus:border-blue-500"
-                      >
-                          {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none"/>
-                  </div>
+                  <CustomSelect 
+                      value={provider} 
+                      onChange={(val) => setProvider(val as LLMProvider)}
+                      options={providers.map(p => ({ id: p.id, name: p.name }))}
+                      className="w-full"
+                  />
                   <input 
                       type="password"
                       value={userApiKey}

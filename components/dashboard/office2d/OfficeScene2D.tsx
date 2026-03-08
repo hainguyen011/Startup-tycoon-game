@@ -5,7 +5,7 @@ import { IsometricFurniture } from './IsometricFurniture';
 
 interface OfficeScene2DProps {
     state: GameState;
-    onEmployeeClick: (empId: string) => void;
+    onOpenChat: (empId: string) => void;
     isModalOpen?: boolean;
 }
 
@@ -23,7 +23,7 @@ export const toScreen = (x: number, y: number) => {
     };
 };
 
-export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onEmployeeClick, isModalOpen }) => {
+export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onOpenChat, isModalOpen }) => {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -31,6 +31,32 @@ export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onEmployeeC
 
     const officeFacility = state.facilities.find(f => f.id === 'office');
     const level = officeFacility ? officeFacility.level : 1;
+
+    // Helper to get descriptive status
+    const getEmployeeStatus = (emp: Employee) => {
+        if (!emp) return 'idle';
+        if (emp.stress > 85) return 'burnout';
+        
+        // Check Contract assignment
+        if (emp.assignedContractId) return 'contract_work';
+        
+        // Check Product module assignment
+        if (emp.assignedProductId) {
+            // Try to find WHICH module to get specific role
+            const product = state.products.find(p => p.id === emp.assignedProductId);
+            const module = product?.modules.find(m => m.assignedEmployeeId === emp.id);
+            
+            if (module) {
+                if (module.requiredSkill === 'Database') return 'querying_db';
+                if (module.requiredSkill === 'Backend') return 'coding_backend';
+                if (module.requiredSkill === 'Frontend' || module.requiredSkill === 'Design') return 'designing_ui';
+            }
+            return 'coding_backend'; // Default if assigned to product but module not found
+        }
+
+        if (emp.morale > 70) return 'coffee_time';
+        return 'idle';
+    };
 
     // ENVIRONMENT THEMES based on Level
     const theme = useMemo(() => {
@@ -154,10 +180,10 @@ export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onEmployeeC
                 depth: gridX + gridY - 0.2
             });
 
-            // 2. Middle Layer: Employee
+            // 2. Middle Layer: Employee BODY
             elements.push({
-                type: 'employee',
-                id: emp.id,
+                type: 'employee-body',
+                id: `body-${emp.id}`,
                 gridX: gridX + 0.3,
                 gridY: gridY - 0.2,
                 data: emp,
@@ -171,6 +197,16 @@ export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onEmployeeC
                 gridX,
                 gridY,
                 depth: gridX + gridY + 0.1
+            });
+
+            // 3.5 Top Layer: Employee HANDS (Above desk)
+            elements.push({
+                type: 'employee-hands',
+                id: `hands-${emp.id}`,
+                gridX: gridX + 0.3,
+                gridY: gridY - 0.2,
+                data: emp,
+                depth: gridX + gridY + 0.2
             });
 
             // 4. TOP LAYER: Social Bubble (Always on top of furniture)
@@ -274,51 +310,79 @@ export const OfficeScene2D: React.FC<OfficeScene2DProps> = ({ state, onEmployeeC
                                             employee={{} as any} // Dummy, we only need bubble part
                                             x={screenPos.x}
                                             y={screenPos.y}
-                                            isWorking={false}
+                                            status="idle"
                                             onClick={() => { }}
                                             onlyBubble={true}
                                             socialMessage={el.data}
                                         />
                                     );
                                 }
-                                return (
-                                    <EmployeeSprite
-                                        key={el.id}
-                                        employee={el.data as Employee}
-                                        x={screenPos.x}
-                                        y={screenPos.y}
-                                        isWorking={(el.data as any).energy > 10}
-                                        onClick={() => onEmployeeClick(el.data.id)}
-                                        hideLabel={isModalOpen}
-                                    />
-                                );
+                                if (el.type === 'employee-body') {
+                                    return (
+                                        <EmployeeSprite
+                                            key={el.id}
+                                            employee={el.data as Employee}
+                                            x={screenPos.x}
+                                            y={screenPos.y}
+                                            status={getEmployeeStatus(el.data as Employee)}
+                                            onClick={() => onOpenChat(el.data.id)}
+                                            hideLabel={isModalOpen}
+                                            renderMode="body"
+                                        />
+                                    );
+                                }
+                                if (el.type === 'employee-hands') {
+                                    return (
+                                        <EmployeeSprite
+                                            key={el.id}
+                                            employee={el.data as Employee}
+                                            x={screenPos.x}
+                                            y={screenPos.y}
+                                            status={getEmployeeStatus(el.data as Employee)}
+                                            onClick={() => onOpenChat(el.data.id)}
+                                            hideLabel={true}
+                                            renderMode="hands"
+                                        />
+                                    );
+                                }
+                                return null;
                             })}
                         </g>
                     </svg>
                 </div>
             </div>
 
-            {/* Dynamic Corporate HUD Overlay */}
+            {/* Dynamic Corporate HUD Overlay - Softened Signboard Style */}
             <div className="absolute top-6 left-6 z-10 pointer-events-none flex flex-col gap-2">
-                <div className="bg-[#1e272e] text-white px-6 py-4 rounded-tr-[3rem] rounded-bl-[1.5rem] border-l-[12px] border-amber-500 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md min-w-[200px]">
-                    <div className="text-[10px] font-black text-amber-400 uppercase tracking-[0.5em] mb-1 opacity-80">{theme.label}</div>
-                    <div className="flex items-baseline justify-between gap-4">
-                        <div className="text-4xl font-black tracking-tighter flex items-center gap-2">
-                            {state.employees.length}<span className="opacity-30 text-xl font-medium">/{officeFacility?.value || 3}</span>
+                <div className="bg-slate-900/80 text-white px-5 py-4 rounded-xl border-l-4 border-amber-500/80 shadow-[0_15px_30px_rgba(0,0,0,0.25)] backdrop-blur-md min-w-[200px] border border-white/5">
+                    <div className="text-[9px] font-bold text-amber-500/90 uppercase tracking-[0.3em] mb-1.5 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        {theme.label}
+                    </div>
+                    <div className="flex items-center justify-between gap-5">
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black tracking-tighter text-white">
+                                {state.employees.length}
+                            </span>
+                            <span className="text-lg font-bold text-slate-400">
+                                /{officeFacility?.value || 3}
+                            </span>
                         </div>
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            TEAM SIZE
+                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right leading-tight opacity-70">
+                            TEAM<br/>SIZE
                         </div>
                     </div>
-                    <div className="mt-3 w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="mt-3 w-full h-1.5 bg-slate-800/50 rounded-full overflow-hidden border border-white/5">
                         <div
-                            className={`h-full transition-all duration-1000 ${state.employees.length >= (officeFacility?.value || 3) ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`}
+                            className={`h-full transition-all duration-1000 ${state.employees.length >= (officeFacility?.value || 3) ? 'bg-rose-500/80 animate-pulse' : 'bg-amber-500/80'}`}
                             style={{ width: `${Math.min(100, (state.employees.length / (officeFacility?.value || 3)) * 100)}%` }}
                         />
                     </div>
-                    <div className="mt-2 text-[9px] font-bold text-slate-500 uppercase tracking-tighter flex justify-between">
-                        <span>Lvl. {level}</span>
-                        <span>{officeFacility?.value ? officeFacility.value - state.employees.length : 0} SLOTS LEFT</span>
+                    <div className="mt-2.5 text-[9px] font-bold uppercase tracking-wider flex justify-between opacity-80">
+                        <span className="text-slate-500">Lvl. <span className="text-slate-400">{level}</span></span>
+                        <span className={state.employees.length >= (officeFacility?.value || 3) ? 'text-rose-400' : 'text-amber-500/80'}>
+                            {officeFacility?.value ? officeFacility.value - state.employees.length : 0} SLOTS LEFT
+                        </span>
                     </div>
                 </div>
             </div>

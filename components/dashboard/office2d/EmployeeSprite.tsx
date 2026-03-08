@@ -6,17 +6,33 @@ interface EmployeeSpriteProps {
     x: number;
     y: number;
     onClick: () => void;
-    isWorking: boolean;
+    status: string;
     hideLabel?: boolean;
     socialMessage?: { text: string; icon: string } | null;
     onlyBubble?: boolean;
+    renderMode?: 'all' | 'body' | 'hands';
 }
 
 export const EmployeeSprite: React.FC<EmployeeSpriteProps> = ({
-    employee, x, y, onClick, isWorking, hideLabel, socialMessage, onlyBubble
+    employee, x, y, onClick, status, hideLabel, socialMessage, onlyBubble, renderMode = 'all'
 }) => {
-    // Good Company utilizes orange/teal silhouettes
-    const isStressed = employee.stress > 80;
+    // Determine visuals based on status
+    const isWorking = ['coding_backend', 'designing_ui', 'querying_db', 'contract_work'].includes(status);
+    const isBurnout = status === 'burnout';
+    const isCoffee = status === 'coffee_time';
+    
+    // Status icons
+    const statusIcons: Record<string, string> = {
+        coding_backend: "💻",
+        designing_ui: "🎨",
+        querying_db: "🗄️",
+        contract_work: "📑",
+        coffee_time: "☕",
+        burnout: "🤯",
+        idle: "💤"
+    };
+
+    const isStressed = employee.stress > 80 || isBurnout;
     const baseColor = isStressed ? '#e74c3c' : '#e67e22';
 
     // Calculate dynamic width for the bubble
@@ -37,29 +53,46 @@ export const EmployeeSprite: React.FC<EmployeeSpriteProps> = ({
                     <ellipse cx="0" cy="5" rx="20" ry="10" fill="black" opacity="0.1" />
 
                     {/* CHARACTER SPRITE */}
-                    <g className={`${isWorking ? 'animate-bounce-slow' : 'animate-idle-sway'}`}>
-                        {/* Body */}
-                        <path
-                            d="M -22 0 Q -22 -46 0 -50 Q 22 -46 22 0 Z"
-                            fill={baseColor}
-                            stroke="#2c3e50"
-                            strokeWidth="3.2"
-                        />
-                        {/* Head */}
-                        <circle
-                            cx="0" cy="-68" r="19"
-                            fill={baseColor}
-                            stroke="#2c3e50"
-                            strokeWidth="3.2"
-                        />
-                        {/* Typing Hands */}
-                        {isWorking && (
+                    <g className={`
+                        ${isWorking ? 'animate-bounce-slow' : 'animate-idle-sway'}
+                        ${isBurnout ? 'animate-shake' : ''}
+                    `}>
+                        {/* Body - Render if mode is 'all' or 'body' */}
+                        {(renderMode === 'all' || renderMode === 'body') && (
+                            <>
+                                <path
+                                    d="M -22 0 Q -22 -46 0 -50 Q 22 -46 22 0 Z"
+                                    fill={baseColor}
+                                    stroke="#2c3e50"
+                                    strokeWidth="3.2"
+                                />
+                                <circle
+                                    cx="0" cy="-68" r="19"
+                                    fill={baseColor}
+                                    stroke="#2c3e50"
+                                    strokeWidth="3.2"
+                                />
+                            </>
+                        )}
+
+                        {/* Typing Hands - Render if mode is 'all' or 'hands' */}
+                        {(renderMode === 'all' || renderMode === 'hands') && isWorking && (
                             <g className="animate-typing-hands">
-                                <circle cx="-20" cy="-30" r="5.5" fill="#f39c12" stroke="#2c3e50" strokeWidth="2.5" />
-                                <circle cx="20" cy="-30" r="5.5" fill="#f39c12" stroke="#2c3e50" strokeWidth="2.5" />
+                                {/* Left Hand - Positioned on keyboard */}
+                                <circle cx="-34" cy="-28" r="5.5" fill="#f39c12" stroke="#2c3e50" strokeWidth="2.5" />
+                                {/* Right Hand - Positioned on keyboard */}
+                                <circle cx="-14" cy="-20" r="5.5" fill="#f39c12" stroke="#2c3e50" strokeWidth="2.5" />
                             </g>
                         )}
                     </g>
+
+                    {/* STATUS INDICATOR (When not in convo) - Only on body layer */}
+                    {(renderMode === 'all' || renderMode === 'body') && !socialMessage && (
+                        <g transform="translate(25, -85)" className="animate-bubble-pop">
+                            <circle r="12" fill="white" stroke="#2c3e50" strokeWidth="2" />
+                            <text y="4" textAnchor="middle" fontSize="12">{statusIcons[status]}</text>
+                        </g>
+                    )}
                 </>
             )}
 
@@ -118,10 +151,16 @@ export const EmployeeSprite: React.FC<EmployeeSpriteProps> = ({
           from { opacity: 0; transform: translateY(10px) scale(0.6); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-2px) rotate(-1deg); }
+          75% { transform: translateX(2px) rotate(1deg); }
+        }
         .animate-bounce-slow { animation: bounce-slow 0.4s infinite; }
         .animate-idle-sway { animation: idle-sway 3s ease-in-out infinite; }
         .animate-typing-hands { animation: typing-hands 0.15s infinite; }
         .animate-bubble-pop { animation: bubble-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-shake { animation: shake 0.2s infinite; }
       `}</style>
         </g>
     );

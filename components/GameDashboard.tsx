@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GameState, GameStage, PlayerDecisions, WorkMode, WelfareLevel, InteractiveEvent, IntelItem, IntelType } from '../types';
+import { useLanguage } from '../LanguageContext';
 
 // Layout
 import { TopHUD } from './dashboard/layout/TopHUD';
@@ -43,6 +44,7 @@ interface GameDashboardProps {
   onNegotiate: (investorId: string, message: string) => void;
   onPitch: (round: string) => Promise<{ success: boolean, message: string }>;
   onChatWithEmployee: (empId: string, message: string) => Promise<string>;
+  onTrainEmployee: (empId: string, skillType: string) => void;
   onBuyIntel: (type: IntelType, cost: number) => void;
   onUpgradeFacility: (id: string) => void;
   activeEvent: InteractiveEvent | null;
@@ -54,16 +56,17 @@ interface GameDashboardProps {
 export const GameDashboard: React.FC<GameDashboardProps> = ({
   state, onTurnSubmit, isProcessing, onRestart, onCreateProduct,
   onFire, onRecruit, onHireCandidate, onAskAdvice, onAcceptContract, onAssignEmployee, onAssignToModule,
-  onFindContracts, onFindInvestor, onNegotiate, onPitch, onChatWithEmployee,
+  onFindContracts, onFindInvestor, onNegotiate, onPitch, onChatWithEmployee, onTrainEmployee,
   onBuyIntel, onUpgradeFacility, activeEvent, handleEventChoice,
   currentIntel, onDismissIntel
 }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('overview');
   const [isCommandOpen, setIsCommandOpen] = useState(false);
 
   // CommandCenter states
-  const [rdFocus, setRdFocus] = useState('Core Features');
-  const [marketingFocus, setMarketingFocus] = useState('Social Media Ads');
+  const [rdFocus, setRdFocus] = useState(t('dashboard.command.rdOptions.core'));
+  const [marketingFocus, setMarketingFocus] = useState(t('dashboard.command.mktOptions.ads'));
   const [workMode, setWorkMode] = useState<WorkMode>(WorkMode.STANDARD);
   const [welfareLevel, setWelfareLevel] = useState<WelfareLevel>(WelfareLevel.STANDARD);
   const [strategyNote, setStrategyNote] = useState('');
@@ -95,7 +98,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
             <div className="h-[calc(100vh-140px)]">
               <OfficeScene2D
                 state={state}
-                onEmployeeClick={setActiveChatEmployeeId}
+                onOpenChat={setActiveChatEmployeeId}
                 isModalOpen={!!(activeChatEmployeeId || activeEvent || (currentIntel && currentIntel.length > 0))}
               />
             </div>
@@ -103,7 +106,7 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
           {activeTab === 'products' && <ProductsTab state={state} onCreateProduct={onCreateProduct} onAssignToModule={onAssignToModule} />}
           {activeTab === 'contracts' && <ContractsTab state={state} onFindContracts={onFindContracts} onAcceptContract={onAcceptContract} onAssignEmployee={onAssignEmployee} isProcessing={isProcessing} />}
           {activeTab === 'investment' && <InvestmentTab state={state} onAskAdvice={onAskAdvice} onFindInvestor={onFindInvestor} onNegotiate={onNegotiate} isProcessing={isProcessing} />}
-          {activeTab === 'team' && <TeamTab state={state} onFire={onFire} onRecruit={onRecruit} onHireCandidate={onHireCandidate} onOpenChat={setActiveChatEmployeeId} isProcessing={isProcessing} />}
+          {activeTab === 'team' && <TeamTab state={state} onFire={onFire} onRecruit={onRecruit} onHireCandidate={onHireCandidate} onOpenChat={setActiveChatEmployeeId} onTrainEmployee={onTrainEmployee} isProcessing={isProcessing} />}
           {activeTab === 'founder' && <FounderTab state={state} />}
           {activeTab === 'council' && <CouncilTab state={state} onAskAdvice={onAskAdvice} />}
           {activeTab === 'infra' && <InfraTab state={state} onUpgradeFacility={onUpgradeFacility} />}

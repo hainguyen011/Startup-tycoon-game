@@ -91,9 +91,9 @@ const GameContainer: React.FC = () => {
                 bugs: 0,
                 techDebt: 0,
                 modules: [
-                    { id: 'm1', name: t('dashboard.products.modules.core'), requiredSkill: 'Backend', progress: 0, quality: 50, assignedEmployeeId: null },
-                    { id: 'm2', name: t('dashboard.products.modules.ui'), requiredSkill: 'Frontend', progress: 0, quality: 50, assignedEmployeeId: null },
-                    { id: 'm3', name: t('dashboard.products.modules.db'), requiredSkill: 'Database', progress: 0, quality: 50, assignedEmployeeId: null }
+                    { id: 'mod-1', name: 'Database Architecture', requiredCoreSkill: 'technical', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 },
+                    { id: 'mod-2', name: 'Backend API', requiredCoreSkill: 'technical', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 },
+                    { id: 'mod-3', name: 'Frontend App', requiredCoreSkill: 'creative', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 }
                 ],
                 users: 0,
                 revenue: 0,
@@ -160,7 +160,7 @@ const GameContainer: React.FC = () => {
             const newIntel: IntelItem = {
                 id: Date.now().toString(),
                 type,
-                title: type === IntelType.MARKET ? "Market Report" : type === IntelType.COMPETITOR ? "Spy Report" : "Internal Audit",
+                title: type === IntelType.MARKET ? t('dashboard.intel.market_report') : type === IntelType.COMPETITOR ? t('dashboard.intel.spy_report') : t('dashboard.intel.audit_report'),
                 content: insightData.content,
                 source: insightData.source,
                 reliability: insightData.reliability,
@@ -176,7 +176,7 @@ const GameContainer: React.FC = () => {
     };
 
     const handleDismissIntel = (id: string) => {
-        setCurrentIntel(prev => prev.filter(i => i.id !== id));
+        setCurrentIntel(prev => prev.filter(i => i.id === id));
     };
 
     const handleRecruit = async (jobDesc: string, budget: number) => {
@@ -200,51 +200,50 @@ const GameContainer: React.FC = () => {
         }
     };
 
-    const handleHireCandidate = (candidate: Candidate) => {
+    const handleHireCandidate = (candidate: Candidate, isTrial: boolean = false) => {
         const office = gameState.facilities.find(f => f.id === 'office');
-        if (office && gameState.employees.length >= office.value) {
+        const currentEmployeesCount = gameState.employees.length;
+        const maxCapacity = office ? office.value : 5; // Default if somehow missing
+
+        if (currentEmployeesCount >= maxCapacity) {
             alert(t('alerts.officeFull'));
             return;
         }
-        if (gameState.cash < candidate.hireCost) {
+
+        const cost = isTrial ? Math.floor(candidate.hireCost / 2) : candidate.hireCost;
+        if (gameState.cash < cost) {
             alert(t('alerts.noFundsHire'));
             return;
         }
-
-        const possibleTraits = [
-            t('traits.diligent'),
-            t('traits.lazy'),
-            t('traits.loyal'),
-            t('traits.sensitive'),
-            t('traits.ambitious'),
-            t('traits.sociable'),
-            t('traits.eccentric')
-        ];
-        const randomTraits = [possibleTraits[Math.floor(Math.random() * possibleTraits.length)]];
-        if (Math.random() > 0.5) randomTraits.push(possibleTraits[Math.floor(Math.random() * possibleTraits.length)]);
 
         const newEmp: Employee = {
             id: candidate.id,
             name: candidate.name,
             role: candidate.role,
             level: candidate.level,
-            skill: candidate.skill,
+            skills: candidate.skills,
+            proStats: candidate.proStats,
             specificSkills: candidate.specificSkills,
-            salary: candidate.salary,
+            salary: isTrial ? Math.floor(candidate.salary * 0.5) : candidate.salary,
             morale: 80 + Math.floor(Math.random() * 20),
+            health: 100, // Thể lực đầy đủ
+            stress: 0,
+            loyalty: 50 + Math.floor(Math.random() * 50),
             quirk: candidate.quirk,
             education: candidate.education,
             backgroundStory: candidate.bio,
-            stress: 0,
-            loyalty: 50 + Math.floor(Math.random() * 50),
-            traits: randomTraits,
+            hiddenTraits: candidate.hiddenTraits,
+            headhuntStatus: 'none',
+            isOnLeave: false,
+            leaveTurnsLeft: 0,
+            trialTurnsLeft: isTrial ? 2 : 0, // 2 tuần thử việc
             assignedProductId: null,
             assignedContractId: null
         };
 
         setGameState(prev => ({
             ...prev,
-            cash: prev.cash - candidate.hireCost,
+            cash: prev.cash - cost,
             employees: [...prev.employees, newEmp],
             candidates: prev.candidates.filter(c => c.id !== candidate.id)
         }));
@@ -295,18 +294,35 @@ const GameContainer: React.FC = () => {
     const handleAssignToModule = (empId: string, productId: string, moduleId: string | null) => {
         setGameState(prev => ({
             ...prev,
+            // 1. Update Employee state to link them to this product
+            employees: prev.employees.map(e => {
+                if (e.id === empId) {
+                    return {
+                        ...e,
+                        assignedProductId: empId ? productId : null,
+                        assignedContractId: null // Clear contract if assigned to product
+                    };
+                }
+                return e;
+            }),
+            // 2. Update Product state to link them to the module
             products: prev.products.map(p => {
                 if (p.id === productId) {
                     return {
                         ...p,
                         modules: p.modules.map(m => {
-                            if (m.id === moduleId) return { ...m, assignedEmployeeId: empId };
+                            if (m.id === moduleId) return { ...m, assignedEmployeeId: empId || null };
                             if (m.assignedEmployeeId === empId) return { ...m, assignedEmployeeId: null };
                             return m;
                         })
                     };
+                } else {
+                    // If they were assigned to another product's module, clear it
+                    return {
+                        ...p,
+                        modules: p.modules.map(m => m.assignedEmployeeId === empId ? { ...m, assignedEmployeeId: null } : m)
+                    };
                 }
-                return p;
             })
         }));
     };
@@ -323,9 +339,9 @@ const GameContainer: React.FC = () => {
             bugs: 0,
             techDebt: 0,
             modules: [
-                { id: `m1-${Date.now()}`, name: 'Core Engine', requiredSkill: 'Backend', progress: 0, quality: 50, assignedEmployeeId: null },
-                { id: `m2-${Date.now()}`, name: 'User Interface', requiredSkill: 'Frontend', progress: 0, quality: 50, assignedEmployeeId: null },
-                { id: `m3-${Date.now()}`, name: 'Database Schema', requiredSkill: 'Database', progress: 0, quality: 50, assignedEmployeeId: null }
+                { id: `mod-${Date.now()}-1`, name: 'Core Engine', requiredCoreSkill: 'technical', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 },
+                { id: `mod-${Date.now()}-2`, name: 'User Interface', requiredCoreSkill: 'creative', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 },
+                { id: `mod-${Date.now()}-3`, name: 'Marketing Tool', requiredCoreSkill: 'social', progress: 0, quality: 50, assignedEmployeeId: null, bugs: 0 }
             ],
             users: 0,
             revenue: 0,
@@ -335,6 +351,45 @@ const GameContainer: React.FC = () => {
             ...prev,
             products: [...prev.products, newProduct]
         }));
+    };
+
+    // --- TRAINING ---
+    const handleTrainEmployee = (empId: string, skillType: string) => {
+        const TRAINING_COST = 500;
+        if (gameState.cash < TRAINING_COST) {
+            alert(t('alerts.noFundsHire') || "Not enough funds for training.");
+            return;
+        }
+
+        setGameState(prev => {
+            const updatedEmployees = prev.employees.map(emp => {
+                if (emp.id === empId) {
+                    const growthMulti = emp.proStats?.growthPotential ? (emp.proStats.growthPotential / 100) + 1 : 1;
+                    const gain = Math.floor((Math.random() * 4 + 2) * growthMulti); // Gain 2-5 * GrowthMultiplier
+                    let newSkills = { ...emp.skills };
+                    
+                    if (skillType in newSkills) {
+                        newSkills[skillType as keyof typeof newSkills] = Math.min(100, (newSkills[skillType as keyof typeof newSkills] || 0) + gain);
+                    } else if (emp.proStats && skillType in emp.proStats) {
+                        // For Pro Stats training
+                        emp.proStats[skillType as keyof typeof emp.proStats] = Math.min(100, (emp.proStats[skillType as keyof typeof emp.proStats] || 0) + gain);
+                    }
+
+                    return {
+                        ...emp,
+                        skills: newSkills,
+                        morale: Math.min(100, emp.morale + 10)
+                    };
+                }
+                return emp;
+            });
+
+            return {
+                ...prev,
+                cash: prev.cash - TRAINING_COST,
+                employees: updatedEmployees
+            };
+        });
     };
 
     // --- CONTRACTS & INVESTORS ---
@@ -507,14 +562,20 @@ const GameContainer: React.FC = () => {
             facilities: prev.facilities.map(f => {
                 if (f.id === facilityId) {
                     const nextLevel = f.level + 1;
-                    const newValue = nextLevel === 2 ? 8 : nextLevel === 3 ? 15 : nextLevel === 4 ? 30 : 60;
+                    let newValue = f.value;
+                    if (f.id === 'office') newValue = nextLevel === 2 ? 8 : nextLevel === 3 ? 15 : nextLevel === 4 ? 30 : 60;
+                    else if (f.id === 'server') newValue = nextLevel === 2 ? 5000 : nextLevel === 3 ? 15000 : nextLevel === 4 ? 50000 : 100000;
+                    else if (f.id === 'pc') newValue += 5; // +5% Productivity
+                    else if (f.id === 'chair') newValue += 5; // +5% Reliability
+                    else if (f.id === 'coffee') newValue += 2; // -2 Stress
+
                     return {
                         ...f,
                         level: nextLevel,
                         costToUpgrade: f.costToUpgrade * 2.5,
                         value: newValue,
-                        benefit: f.id === 'office' ? `Max ${newValue} Employees` : `Max ${newValue.toLocaleString()} Users`,
-                        description: t('dashboard.facilities.officeDesc', { cap: newValue }) || `Capacity: ${newValue} employees`
+                        benefit: t(`dashboard.infra.${f.id}.benefit`, { value: newValue.toLocaleString() }) || f.benefit,
+                        description: `${t('dashboard.infra.level')} ${nextLevel}`
                     };
                 }
                 return f;
@@ -551,7 +612,7 @@ const GameContainer: React.FC = () => {
                 if (contract.status !== 'active') return contract;
 
                 const team = gameState.employees.filter(e => e.assignedContractId === contract.id);
-                const weeklyProgress = team.reduce((acc, e) => acc + (e.skill / 2), 0); // Skill points contribution
+                const weeklyProgress = team.reduce((acc, e) => acc + ((e.skills?.technical || 0) / 2), 0); // Skill points contribution
 
                 let newEffort = contract.currentEffort + weeklyProgress;
                 let newDeadline = contract.deadlineWeeks - 1;
@@ -584,15 +645,58 @@ const GameContainer: React.FC = () => {
                 // Unassign employees from finished contracts
                 const finishedContractIds = updatedContracts.filter(c => c.status === 'completed' || c.status === 'failed').map(c => c.id);
                 const updatedEmployees = prev.employees.map(e => {
-                    if (e.assignedContractId && finishedContractIds.includes(e.assignedContractId)) {
-                        return { ...e, assignedContractId: null };
+                    let updatedE = { ...e };
+                    
+                    if (updatedE.assignedContractId && finishedContractIds.includes(updatedE.assignedContractId)) {
+                        updatedE.assignedContractId = null;
                     }
-                    // Stress logic
-                    let s = e.stress + ((result.cashChange - totalTurnExpenses) < 0 ? 5 : 0);
-                    if (e.assignedProductId || e.assignedContractId) s += 2;
+
+                    // Trial Period Check
+                    if (updatedE.trialTurnsLeft && updatedE.trialTurnsLeft > 0) {
+                        updatedE.trialTurnsLeft -= 1;
+                        if (updatedE.trialTurnsLeft === 0 && updatedE.salary) {
+                            // End of trial, restore full salary
+                            updatedE.salary = updatedE.salary * 2;
+                        }
+                    }
+                    
+                    // Leave Period Check
+                    if (updatedE.leaveTurnsLeft && updatedE.leaveTurnsLeft > 0) {
+                        updatedE.leaveTurnsLeft -= 1;
+                        if (updatedE.leaveTurnsLeft === 0) {
+                            updatedE.isOnLeave = false;
+                        }
+                    }
+
+                    // Apply AI EmployeeUpdates (Synergy, Health, Events)
+                    const eUpdate = result.employeeUpdates?.find(eu => eu.employeeId === updatedE.id);
+                    if (eUpdate) {
+                        if (eUpdate.healthChange) updatedE.health = Math.max(0, Math.min(100, updatedE.health + eUpdate.healthChange));
+                        if (eUpdate.stressChange) updatedE.stress = Math.max(0, Math.min(100, updatedE.stress + eUpdate.stressChange));
+                        if (eUpdate.reliabilityChange && updatedE.proStats) updatedE.proStats.reliability = Math.max(0, Math.min(100, updatedE.proStats.reliability + eUpdate.reliabilityChange));
+                        if (eUpdate.productivityChange && updatedE.proStats) updatedE.proStats.productivity = Math.max(0, Math.min(100, updatedE.proStats.productivity + eUpdate.productivityChange));
+                        if (eUpdate.leaveTurns && eUpdate.leaveTurns > 0) {
+                            updatedE.isOnLeave = true;
+                            updatedE.leaveTurnsLeft = eUpdate.leaveTurns;
+                        }
+                        if (eUpdate.headhuntOffer) {
+                            updatedE.headhuntStatus = 'offered';
+                        }
+                    }
+
+                    // Base Stress logic & Buffs
+                    let s = updatedE.stress + ((result.cashChange - totalTurnExpenses) < 0 ? 5 : 0);
+                    if (updatedE.assignedProductId || updatedE.assignedContractId) s += 2;
                     s -= (prev.playerSkills.management * 0.5);
+                    
+                    const coffeeMachine = prev.facilities.find(fac => fac.id === 'coffee');
+                    if (coffeeMachine) s -= coffeeMachine.value;
+
                     s = Math.max(0, Math.min(100, s));
-                    return { ...e, stress: s, morale: s > 80 ? Math.max(0, e.morale - 5) : e.morale };
+                    updatedE.stress = s;
+                    updatedE.morale = s > 80 ? Math.max(0, updatedE.morale - 5) : updatedE.morale;
+                    
+                    return updatedE;
                 });
 
                 // Financials
@@ -748,6 +852,7 @@ const GameContainer: React.FC = () => {
                         onFindInvestor={handleFindInvestor}
                         onNegotiate={handleNegotiate}
                         onAskAdvice={handleAskAdvice}
+                        onTrainEmployee={handleTrainEmployee}
                     />
                 )}
             </div>

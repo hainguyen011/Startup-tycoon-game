@@ -96,7 +96,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ state, marketingFocus 
                      <div className="w-20 h-20 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center mb-4 mx-auto">
                          <Target size={36} className="text-indigo-500"/>
                      </div>
-                     <div className="text-3xl font-bold font-heading text-slate-900 mb-1">{state.stage}</div>
+                     <div className="text-3xl font-bold font-heading text-slate-900 mb-1">{t(`dashboard.stages.${state.stage.toLowerCase().replace('-', '') as 'prelaunch' | 'mvp' | 'growth' | 'scaleup' | 'unicorn' | 'exit'}`)}</div>
                      <div className="text-sm text-slate-500 uppercase font-bold tracking-wider">{t('dashboard.stats.stage')}</div>
                  </div>
             </div>

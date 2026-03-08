@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GameState, InteractiveEvent, IntelType, PlayerDecisions, WorkMode, WelfareLevel } from '../../../types';
 import Button from '../../Button';
+import CustomSelect from '../../CustomSelect';
 import { DirectiveSelector } from '../../DirectiveSelector';
 import { BrainCircuit, X, TrendingUp, Eye, Settings2, Megaphone, Zap, Coffee, FileText, Landmark, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -33,7 +34,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   strategyNote, setStrategyNote, onPitch, onTurnSubmit, isProcessing, activeEvent 
 }) => {
   const { t } = useLanguage();
-  const [fundingRound, setFundingRound] = useState('Seed Round ($200k)');
+  const [fundingRound, setFundingRound] = useState('seed');
   const [pitchResult, setPitchResult] = useState<{success: boolean, message: string} | null>(null);
 
   const handlePitchClick = async () => { 
@@ -156,11 +157,16 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               {/* Funding */}
              <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 space-y-3">
                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><Landmark size={16}/> {t('dashboard.funding.title')}</div>
-                 <select value={fundingRound} onChange={e => setFundingRound(e.target.value)} className="w-full text-xs p-2.5 bg-white/80 border border-amber-200 rounded-lg font-medium outline-none text-amber-900">
-                     <option>{t('dashboard.funding.seed')}</option>
-                     <option>{t('dashboard.funding.seriesA')}</option>
-                     <option>{t('dashboard.funding.seriesB')}</option>
-                 </select>
+                 <CustomSelect 
+                     value={fundingRound} 
+                     onChange={setFundingRound}
+                     options={[
+                        { id: 'seed', name: t('dashboard.funding.seed') },
+                        { id: 'seriesA', name: t('dashboard.funding.seriesA') },
+                        { id: 'seriesB', name: t('dashboard.funding.seriesB') }
+                     ]}
+                     className="w-full"
+                 />
                  <Button onClick={handlePitchClick} className="w-full text-xs bg-amber-600 hover:bg-amber-700 text-white border-none shadow-amber-200">{t('dashboard.funding.pitch')}</Button>
                  {pitchResult && <div className={`text-xs p-2 rounded ${pitchResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{pitchResult.message}</div>}
              </div>

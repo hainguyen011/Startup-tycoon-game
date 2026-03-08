@@ -33,7 +33,7 @@ export const SidebarDesktop: React.FC<SidebarDesktopProps> = ({ state, activeTab
         <div className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 pt-20 pb-4 px-3 gap-1 shrink-0 z-10 overflow-y-auto custom-scrollbar">
             <div className="text-xs font-bold text-slate-400 px-4 py-2 uppercase tracking-wider mb-1">{t('dashboard.ops')}</div>
             <SidebarItem id="overview" label={t('dashboard.tabs.overview')} icon={<LayoutDashboard />} />
-            <SidebarItem id="office3d" label="Office" icon={<Building />} />
+            <SidebarItem id="office3d" label={t('dashboard.tabs.office')} icon={<Building />} />
             <SidebarItem id="products" label={t('dashboard.tabs.products')} icon={<Package />} />
             <SidebarItem id="contracts" label={t('dashboard.tabs.contracts')} icon={<ScrollText />} />
             <SidebarItem id="investment" label={t('dashboard.tabs.investment')} icon={<Handshake />} />
