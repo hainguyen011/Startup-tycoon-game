@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GameState, Candidate, Employee } from '../../../types';
+import { GameState, Candidate, Employee, InterviewData } from '../../../types';
 import Button from '../../Button';
 import { Users, FileSearch, X, ShieldAlert, Target, Zap, TrendingUp, Search } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
@@ -12,16 +12,22 @@ interface TeamTabProps {
   onHireCandidate: (candidate: Candidate, isTrial: boolean) => void;
   onOpenChat: (empId: string) => void;
   onTrainEmployee: (empId: string, skillType: string) => void;
+  onGiveBonus: (empId: string, amount: number) => void;
+  onOrganizeEvent: (eventType: string) => void;
+  onStartInterview: (candidateId: string) => Promise<InterviewData | null>;
+  onSelectInterviewOption: (candidateId: string, trait: string, isCorrect: boolean) => void;
   isProcessing: boolean;
 }
 
-export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHireCandidate, onOpenChat, onTrainEmployee, isProcessing }) => {
+export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHireCandidate, onOpenChat, onTrainEmployee, onGiveBonus, onOrganizeEvent, onStartInterview, onSelectInterviewOption, isProcessing }) => {
   const { t } = useLanguage();
   const [hrSubTab, setHrSubTab] = useState<'manage' | 'recruit'>('manage');
   const [jobDescription, setJobDescription] = useState('');
   const [recruitBudget, setRecruitBudget] = useState(1500);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [trainingEmployee, setTrainingEmployee] = useState<Employee | null>(null);
+  const [activeInterview, setActiveInterview] = useState<{ candidateId: string, data: InterviewData } | null>(null);
+  const [interviewResult, setInterviewResult] = useState<{ trait: string, isCorrect: boolean } | null>(null);
 
   const handleHireFromModal = (isTrial: boolean = false) => {
     if (selectedCandidate) {
@@ -30,14 +36,62 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
     }
   };
 
+  const startInterview = async () => {
+      if (!selectedCandidate) return;
+      const data = await onStartInterview(selectedCandidate.id);
+      if (data) {
+          setActiveInterview({ candidateId: selectedCandidate.id, data });
+      }
+  };
+
+  const handleSelectOption = (trait: string) => {
+      if (!activeInterview) return;
+      
+      const isCorrect = trait === activeInterview.data.correctTrait;
+      
+      onSelectInterviewOption(activeInterview.candidateId, trait, isCorrect);
+      setInterviewResult({ trait, isCorrect });
+      
+      // Update local candidate for immediate UI feedback (using functional update to trigger re-render)
+      if (selectedCandidate && isCorrect) {
+          const updatedCandidate = { 
+              ...selectedCandidate, 
+              revealedTraits: [...selectedCandidate.revealedTraits] 
+          };
+          if (!updatedCandidate.revealedTraits.includes(trait)) {
+              updatedCandidate.revealedTraits.push(trait);
+          }
+          setSelectedCandidate(updatedCandidate);
+      }
+  };
+
+  const normalizeTraitKey = (trait: string) => {
+    return trait
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-zA-Z0-9 ]/g, ' ')
+      .split(' ')
+      .filter(word => word.length > 0)
+      .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+  };
+
+  const prettifyTrait = (trait: string) => {
+    return trait
+      .split(/[ \-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const handleCheckReference = () => {
       // Simulate Check Reference unlocking 1 random trait
       if (selectedCandidate && state.cash >= 50 && !selectedCandidate.isReferenceChecked) {
-          // Ideally this should modify the state in App.tsx via a callback, 
-          // For now, we will just mutate the local object for UI or add an onCheckRef callback.
-          // Since we mutate local for UI feel:
           if (selectedCandidate.hiddenTraits.length > 0) {
-              selectedCandidate.revealedTraits.push(selectedCandidate.hiddenTraits[0]);
+              // Add only if not already revealed
+              const traitToReveal = selectedCandidate.hiddenTraits[0];
+              if (!selectedCandidate.revealedTraits.includes(traitToReveal)) {
+                  selectedCandidate.revealedTraits.push(traitToReveal);
+              }
           }
           selectedCandidate.isReferenceChecked = true;
           // Force re-render
@@ -109,10 +163,17 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
                             <div className="bg-slate-50 p-2 rounded-lg border border-slate-100"><div className="text-[10px] text-slate-400 font-bold uppercase mb-1">{t('dashboard.team.wage')}</div><div className="font-bold text-slate-800 text-lg leading-none">${emp.salary}</div></div>
                         </div>
 
-                        <div className="flex gap-2">
-                            <button onClick={() => onOpenChat(emp.id)} className="flex-1 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors">{t('dashboard.team.chat')}</button>
-                            <button onClick={() => setTrainingEmployee(emp)} className="flex-1 py-2 text-xs font-bold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">Train</button>
-                            <button onClick={() => onFire(emp.id)} className="flex-1 py-2 text-xs font-bold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">{t('dashboard.team.fire')}</button>
+                        <div className="flex gap-2 flex-wrap">
+                            <button onClick={() => onOpenChat(emp.id)} className="flex-1 py-2 text-[10px] font-bold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors uppercase tracking-wider">{t('dashboard.team.chat')}</button>
+                            <button onClick={() => setTrainingEmployee(emp)} className="flex-1 py-2 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors uppercase tracking-wider">Train</button>
+                            <button 
+                                onClick={() => onGiveBonus(emp.id, 500)} 
+                                disabled={state.cash < 500}
+                                className="flex-1 py-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors uppercase tracking-wider disabled:opacity-50"
+                            >
+                                Bonus
+                            </button>
+                            <button onClick={() => onFire(emp.id)} className="flex-1 py-2 text-[10px] font-bold text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors uppercase tracking-wider">{t('dashboard.team.fire')}</button>
                         </div>
                     </div>
                 ))}
@@ -130,6 +191,27 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
                         <input type="range" min="500" max="5000" step="100" value={recruitBudget} onChange={e => setRecruitBudget(Number(e.target.value))} className="w-full accent-blue-600"/>
                     </div>
                     <Button onClick={() => onRecruit(jobDescription, recruitBudget)} disabled={isProcessing} className="w-full py-3 shadow-md">{t('dashboard.team.findCandidates')}</Button>
+                    
+                    {/* Headhunter Agency Section */}
+                    <div className="pt-4 border-t border-slate-200">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block text-center">Headhunter Agency</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button 
+                                onClick={() => onOrganizeEvent('recruitment_drive')}
+                                className="p-3 border border-indigo-100 bg-indigo-50 rounded-xl text-left hover:border-indigo-300 transition-all group"
+                            >
+                                <div className="text-xs font-black text-indigo-700 mb-1 group-hover:translate-x-1 transition-transform">Premium Search</div>
+                                <div className="text-[10px] text-indigo-500 font-bold">$2,500 - Rare Talents</div>
+                            </button>
+                            <button 
+                                onClick={() => onOrganizeEvent('executive_search')}
+                                className="p-3 border border-amber-100 bg-amber-50 rounded-xl text-left hover:border-amber-300 transition-all group"
+                            >
+                                <div className="text-xs font-black text-amber-700 mb-1 group-hover:translate-x-1 transition-transform">Executive Search</div>
+                                <div className="text-[10px] text-amber-500 font-bold">$10,000 - Elite Leads</div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {state.candidates.map(c => (
@@ -233,11 +315,16 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
                                 <div className="pt-4 border-t border-slate-100">
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hidden Traits</h4>
                                     <div className="flex gap-2 flex-wrap">
-                                        {selectedCandidate.revealedTraits?.map((trait, i) => (
-                                            <span key={i} className="px-2 py-1 text-xs font-bold text-white bg-slate-800 rounded-md">
-                                                {t(`traits.${trait.toLowerCase()}`) || trait}
-                                            </span>
-                                        ))}
+                                        {selectedCandidate.revealedTraits?.map((trait, i) => {
+                                            const key = normalizeTraitKey(trait);
+                                            const translated = t(`traits.${key}`);
+                                            const display = translated === `traits.${key}` ? prettifyTrait(trait) : translated;
+                                            return (
+                                                <span key={i} className="px-2 py-1 text-xs font-bold text-white bg-slate-800 rounded-md">
+                                                    {display}
+                                                </span>
+                                            );
+                                        })}
                                         {!selectedCandidate.isReferenceChecked && (
                                             <span className="px-2 py-1 text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 border-dashed rounded-md flex items-center gap-1">
                                                 <Search size={12}/> ???
@@ -254,10 +341,13 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
                                  <Button variant="secondary" onClick={handleCheckReference} disabled={selectedCandidate.isReferenceChecked || state.cash < 50} className="flex-1 text-xs py-3 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm bg-white">
                                      <Search size={14} className="inline mr-2"/> {t('dashboard.team.hrActions.checkRef')}
                                  </Button>
-                                 <Button variant="secondary" onClick={() => handleHireFromModal(true)} disabled={state.cash < Math.floor(selectedCandidate.hireCost / 2)} className="flex-1 text-xs py-3 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shadow-sm">
-                                     <Zap size={14} className="inline mr-2"/> {t('dashboard.team.hrActions.trial')}
-                                 </Button>
-                             </div>
+                                  <Button variant="secondary" onClick={() => handleHireFromModal(true)} disabled={state.cash < Math.floor(selectedCandidate.hireCost / 2)} className="flex-1 text-xs py-3 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shadow-sm">
+                                      <Zap size={14} className="inline mr-2"/> {t('dashboard.team.hrActions.trial')}
+                                  </Button>
+                                  <Button variant="secondary" onClick={startInterview} disabled={state.interviewTurns <= 0 || selectedCandidate.isInterviewed} className="flex-1 text-xs py-3 border border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm bg-white">
+                                      <Users size={14} className="inline mr-2"/> {t('dashboard.team.hrActions.interview')} ({state.interviewTurns})
+                                  </Button>
+                              </div>
                              <div className="flex gap-3 mt-1">
                                  <Button variant="secondary" onClick={() => setSelectedCandidate(null)} className="w-1/3 py-4 bg-slate-100 text-slate-600 hover:bg-slate-200 border-none font-bold uppercase tracking-wider text-xs">{t('dashboard.team.pass')}</Button>
                                  <Button variant="success" onClick={() => handleHireFromModal(false)} disabled={state.cash < selectedCandidate.hireCost} className="w-2/3 py-4  shadow-xl font-black uppercase tracking-widest text-sm bg-slate-900 border-2 border-slate-800 text-white">
@@ -312,6 +402,86 @@ export const TeamTab: React.FC<TeamTabProps> = ({ state, onFire, onRecruit, onHi
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        {/* Interview Modal */}
+        {activeInterview && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-slideUp my-auto border border-purple-100 flex flex-col max-h-[90vh]">
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100 flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-purple-100">🤝</div>
+                            <div>
+                                <h2 className="text-xl font-black text-purple-900">{t('dashboard.team.hrActions.interviewTitle')}</h2>
+                                <p className="text-xs text-purple-700 font-bold uppercase tracking-wider">{selectedCandidate?.name} - {selectedCandidate?.role}</p>
+                            </div>
+                        </div>
+                        <button onClick={() => { setActiveInterview(null); setInterviewResult(null); }} className="p-2 bg-white rounded-full border border-purple-200 hover:bg-blue-100"><X size={20} className="text-purple-500"/></button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-slate-50/50">
+                        {/* Employer Question */}
+                        <div className="flex items-start gap-3 animate-fadeIn">
+                            <div className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center text-xs font-black shrink-0">CEO</div>
+                            <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-slate-200 shadow-sm max-w-[85%]">
+                                <p className="text-slate-800 font-medium italic text-sm">"{activeInterview.data.question}"</p>
+                            </div>
+                        </div>
+
+                        {/* Candidate Response */}
+                        <div className="flex items-start gap-3 justify-end animate-fadeIn delay-500">
+                            <div className="bg-purple-600 p-4 rounded-2xl rounded-tr-none shadow-lg shadow-purple-200 max-w-[85%] border border-purple-500">
+                                <p className="text-white font-medium text-sm">"{activeInterview.data.candidateResponse}"</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0">{selectedCandidate?.name[0]}</div>
+                        </div>
+
+                        {interviewResult && (
+                            <div className={`p-4 rounded-2xl border flex items-center gap-3 animate-bounceIn ${interviewResult.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${interviewResult.isCorrect ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                                    {interviewResult.isCorrect ? <Zap size={20}/> : <ShieldAlert size={20}/>}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-black text-sm">{interviewResult.isCorrect ? t('alerts.interviewSuccess') : t('alerts.interviewFail')}</p>
+                                    <p className="text-xs opacity-80 font-medium">{interviewResult.isCorrect ? t('alerts.traitRevealed', { trait: prettifyTrait(interviewResult.trait) }) : t('alerts.wrongInterpretation')}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-6 bg-white border-t border-slate-100 shrink-0">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                             {t('dashboard.team.hrActions.interpretLabel')}
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {activeInterview.data.options.map((option, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleSelectOption(option.trait)}
+                                    disabled={!!interviewResult}
+                                    className={`p-4 rounded-xl border text-left transition-all group flex flex-col gap-1
+                                        ${interviewResult && option.trait === activeInterview.data.correctTrait ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 
+                                          interviewResult?.trait === option.trait && !interviewResult.isCorrect ? 'border-red-500 bg-red-50' : 
+                                          interviewResult ? 'opacity-50 grayscale border-slate-200' : 
+                                          'border-slate-200 hover:border-purple-400 hover:bg-purple-50 hover:shadow-md active:scale-[0.98]'}`}
+                                >
+                                    <span className="text-xs font-black text-slate-900 group-hover:text-purple-700">{prettifyTrait(option.trait)}</span>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{option.interpretation}</p>
+                                </button>
+                            ))}
+                        </div>
+
+                        {interviewResult && (
+                            <Button 
+                                onClick={() => { setActiveInterview(null); setInterviewResult(null); }} 
+                                className="w-full mt-6 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-sm shadow-xl"
+                            >
+                                {t('dashboard.team.done')}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

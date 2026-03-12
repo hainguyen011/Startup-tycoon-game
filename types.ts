@@ -129,8 +129,19 @@ export interface Candidate {
   
   // HR Gameplay
   hiddenTraits: string[];
-  revealedTraits: string[]; // Traits discovered via Check Reference
+  revealedTraits: string[]; // Traits discovered via Check Reference or Interview
   isReferenceChecked: boolean;
+  isInterviewed?: boolean; // New: tracking if this candidate was interviewed this week
+}
+
+export interface InterviewData {
+  question: string;
+  candidateResponse: string;
+  options: {
+    trait: string;
+    interpretation: string;
+  }[];
+  correctTrait: string;
 }
 
 export enum ProductStage {
@@ -339,6 +350,7 @@ export interface GameState {
   equity: number;
   turn: number;
   reputation: number; // New: 0-100 score for contracts
+  interviewTurns: number; // New: 2 per week
 
   employees: Employee[];
   candidates: Candidate[];

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GameState, GameStage, PlayerDecisions, WorkMode, WelfareLevel, InteractiveEvent, IntelItem, IntelType } from '../types';
+import { GameState, GameStage, PlayerDecisions, WorkMode, WelfareLevel, InteractiveEvent, IntelItem, IntelType, InterviewData } from '../types';
 import { useLanguage } from '../LanguageContext';
 
 // Layout
@@ -19,6 +19,7 @@ import { FounderTab } from './dashboard/tabs/FounderTab';
 import { CouncilTab } from './dashboard/tabs/CouncilTab';
 import { InfraTab } from './dashboard/tabs/InfraTab';
 import { ReportTab } from './dashboard/tabs/ReportTab';
+import { TutorialTab } from './dashboard/tabs/TutorialTab';
 
 // Modals
 import { ChatModal } from './dashboard/modals/ChatModal';
@@ -51,6 +52,10 @@ interface GameDashboardProps {
   handleEventChoice: (choice: string) => void;
   currentIntel: IntelItem[];
   onDismissIntel: (id: string) => void;
+  onGiveBonus: (empId: string, amount: number) => void;
+  onOrganizeEvent: (eventType: string) => void;
+  onStartInterview: (candidateId: string) => Promise<InterviewData | null>;
+  onSelectInterviewOption: (candidateId: string, trait: string, isCorrect: boolean) => void;
 }
 
 export const GameDashboard: React.FC<GameDashboardProps> = ({
@@ -58,7 +63,8 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
   onFire, onRecruit, onHireCandidate, onAskAdvice, onAcceptContract, onAssignEmployee, onAssignToModule,
   onFindContracts, onFindInvestor, onNegotiate, onPitch, onChatWithEmployee, onTrainEmployee,
   onBuyIntel, onUpgradeFacility, activeEvent, handleEventChoice,
-  currentIntel, onDismissIntel
+  currentIntel, onDismissIntel, onGiveBonus, onOrganizeEvent,
+  onStartInterview, onSelectInterviewOption
 }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('overview');
@@ -106,11 +112,26 @@ export const GameDashboard: React.FC<GameDashboardProps> = ({
           {activeTab === 'products' && <ProductsTab state={state} onCreateProduct={onCreateProduct} onAssignToModule={onAssignToModule} />}
           {activeTab === 'contracts' && <ContractsTab state={state} onFindContracts={onFindContracts} onAcceptContract={onAcceptContract} onAssignEmployee={onAssignEmployee} isProcessing={isProcessing} />}
           {activeTab === 'investment' && <InvestmentTab state={state} onAskAdvice={onAskAdvice} onFindInvestor={onFindInvestor} onNegotiate={onNegotiate} isProcessing={isProcessing} />}
-          {activeTab === 'team' && <TeamTab state={state} onFire={onFire} onRecruit={onRecruit} onHireCandidate={onHireCandidate} onOpenChat={setActiveChatEmployeeId} onTrainEmployee={onTrainEmployee} isProcessing={isProcessing} />}
+          {activeTab === 'team' && (
+            <TeamTab 
+              state={state} 
+              onFire={onFire} 
+              onRecruit={onRecruit} 
+              onHireCandidate={onHireCandidate} 
+              onOpenChat={setActiveChatEmployeeId} 
+              onTrainEmployee={onTrainEmployee} 
+              onGiveBonus={onGiveBonus}
+              onOrganizeEvent={onOrganizeEvent}
+              onStartInterview={onStartInterview}
+              onSelectInterviewOption={onSelectInterviewOption}
+              isProcessing={isProcessing} 
+            />
+          )}
           {activeTab === 'founder' && <FounderTab state={state} />}
           {activeTab === 'council' && <CouncilTab state={state} onAskAdvice={onAskAdvice} />}
           {activeTab === 'infra' && <InfraTab state={state} onUpgradeFacility={onUpgradeFacility} />}
           {activeTab === 'report' && <ReportTab state={state} />}
+          {activeTab === 'tutorial' && <TutorialTab state={state} />}
         </div>
 
         <CommandCenter

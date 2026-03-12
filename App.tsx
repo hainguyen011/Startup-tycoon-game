@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import SetupGame from './components/SetupGame';
 import { GameDashboard } from './components/GameDashboard';
-import { GameState, GameStage, Industry, PlayerDecisions, INITIAL_CASH, SimulationResult, IntelType, IntelItem, INITIAL_FACILITIES, INITIAL_SKILLS, Employee, Candidate, Product, ProductStage, LLMProvider, MARKETING_COSTS, Contract, Investor, MarketCondition, AICompanion } from './types';
-import { initializeGameStory, processTurn, getAdvisorInsight, generateCandidates, chatWithEmployee, evaluatePitch, setLLMConfig, hasValidApiKey, generateContracts, generateInvestor, negotiateDeal, askInvestorAdvice } from './services/gemini';
+import { GameState, GameStage, Industry, PlayerDecisions, INITIAL_CASH, SimulationResult, IntelType, IntelItem, INITIAL_FACILITIES, INITIAL_SKILLS, Employee, Candidate, Product, ProductStage, LLMProvider, MARKETING_COSTS, Contract, Investor, MarketCondition, AICompanion, InterviewData } from './types';
+import { initializeGameStory, processTurn, getAdvisorInsight, generateCandidates, chatWithEmployee, evaluatePitch, setLLMConfig, hasValidApiKey, generateContracts, generateInvestor, negotiateDeal, askInvestorAdvice, generateInterviewData } from './services/gemini';
 import { Loader2 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './LanguageContext';
 
@@ -23,6 +23,7 @@ const GameContainer: React.FC = () => {
         marketShare: 0,
         equity: 100,
         turn: 1,
+        interviewTurns: 2,
         reputation: 10,
         history: [],
         stage: GameStage.SETUP,
@@ -176,7 +177,7 @@ const GameContainer: React.FC = () => {
     };
 
     const handleDismissIntel = (id: string) => {
-        setCurrentIntel(prev => prev.filter(i => i.id === id));
+        setCurrentIntel(prev => prev.filter(i => i.id !== id));
     };
 
     const handleRecruit = async (jobDesc: string, budget: number) => {
@@ -392,6 +393,60 @@ const GameContainer: React.FC = () => {
         });
     };
 
+    // --- HR BOOSTING HANDLERS ---
+    const handleGiveBonus = (empId: string, amount: number) => {
+        if (gameState.cash < amount) {
+            alert(t('alerts.noFundsHire'));
+            return;
+        }
+
+        setGameState(prev => ({
+            ...prev,
+            cash: prev.cash - amount,
+            employees: prev.employees.map(e => e.id === empId ? { 
+                ...e, 
+                morale: Math.min(100, e.morale + 15), 
+                stress: Math.max(0, e.stress - 10) 
+            } : e)
+        }));
+    };
+
+    const handleOrganizeEvent = async (eventType: string) => {
+        let cost = 0;
+        let jobDesc = "";
+        let budget = 0;
+
+        if (eventType === 'recruitment_drive') {
+            cost = 2500;
+            jobDesc = "Premium Talent Search";
+            budget = 3500;
+        } else if (eventType === 'executive_search') {
+            cost = 10000;
+            jobDesc = "Executive/Lead Search";
+            budget = 8000;
+        }
+
+        if (gameState.cash < cost) {
+            alert(t('alerts.noFundsHire'));
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // High quality candidates for these special searches
+            const candidates = await generateCandidates(gameState.industry, gameState.turn + 2, jobDesc, budget, language);
+            setGameState(prev => ({
+                ...prev,
+                cash: prev.cash - cost,
+                candidates: candidates
+            }));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // --- CONTRACTS & INVESTORS ---
 
     const handleFindContracts = async () => {
@@ -545,6 +600,48 @@ const GameContainer: React.FC = () => {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleStartInterview = async (candidateId: string): Promise<InterviewData | null> => {
+        if (gameState.interviewTurns <= 0) {
+            alert(t('alerts.noMoreInterviews'));
+            return null;
+        }
+        
+        const candidate = gameState.candidates.find(c => c.id === candidateId);
+        if (!candidate) return null;
+
+        setLoading(true);
+        try {
+            const interviewData = await generateInterviewData(candidate, language);
+            setGameState(prev => ({
+                ...prev,
+                interviewTurns: prev.interviewTurns - 1,
+                candidates: prev.candidates.map(c => c.id === candidateId ? { ...c, isInterviewed: true } : c)
+            }));
+            return interviewData;
+        } catch (e) {
+            console.error(e);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectInterviewOption = (candidateId: string, trait: string, isCorrect: boolean) => {
+        if (isCorrect) {
+            setGameState(prev => ({
+                ...prev,
+                candidates: prev.candidates.map(c => {
+                    if (c.id === candidateId) {
+                        const revealed = [...c.revealedTraits];
+                        if (!revealed.includes(trait)) revealed.push(trait);
+                        return { ...c, revealedTraits: revealed };
+                    }
+                    return c;
+                })
+            }));
         }
     };
 
@@ -831,6 +928,7 @@ const GameContainer: React.FC = () => {
                     contracts: updatedContracts,
                     employees: updatedEmployees,
                     turn: prev.turn + 1,
+                    interviewTurns: 2, // Reset turns every week
                     history: [...prev.history, result],
                     stage: newStage,
                     marketCondition: newMarketCondition,
@@ -904,6 +1002,10 @@ const GameContainer: React.FC = () => {
                         onNegotiate={handleNegotiate}
                         onAskAdvice={handleAskAdvice}
                         onTrainEmployee={handleTrainEmployee}
+                        onGiveBonus={handleGiveBonus}
+                        onOrganizeEvent={handleOrganizeEvent}
+                        onStartInterview={handleStartInterview}
+                        onSelectInterviewOption={handleSelectInterviewOption}
                     />
                 )}
             </div>

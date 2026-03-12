@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState } from '../../../types';
-import { LayoutDashboard, Package, ScrollText, Handshake, BrainCircuit, Users, User, Server, ClipboardList, MessageSquare, Building } from 'lucide-react';
+import { LayoutDashboard, Package, ScrollText, Handshake, BrainCircuit, Users, User, Server, ClipboardList, MessageSquare, Building, HelpCircle } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 
 interface SidebarDesktopProps {
@@ -45,6 +45,7 @@ export const SidebarDesktop: React.FC<SidebarDesktopProps> = ({ state, activeTab
             <SidebarItem id="founder" label={t('dashboard.tabs.founder')} icon={<User />} />
             <SidebarItem id="infra" label={t('dashboard.tabs.infra')} icon={<Server />} />
             <SidebarItem id="report" label={t('dashboard.tabs.report')} icon={<ClipboardList />} />
+            <SidebarItem id="tutorial" label={t('dashboard.tabs.tutorial')} icon={<HelpCircle />} />
 
             {hasSecretary && (
                 <>

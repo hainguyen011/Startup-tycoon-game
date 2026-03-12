@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Schema, GenerateContentResponse } from "@google/genai";
-import { Language, Industry, GameState, CEODetails, SimulationResult, Employee, Candidate, Product, Contract, Investor, LLMProvider, IntelType, PlayerDecisions, WelfareLevel, WorkMode, MARKETING_COSTS, InitialGameStoryResponse as InitGameResponse } from "../types";
+import { Language, Industry, GameState, CEODetails, SimulationResult, Employee, Candidate, Product, Contract, Investor, LLMProvider, IntelType, PlayerDecisions, WelfareLevel, WorkMode, MARKETING_COSTS, InitialGameStoryResponse as InitGameResponse, InterviewData } from "../types";
 
 // Configuration State
 let currentProvider: LLMProvider = 'gemini';
@@ -546,6 +546,84 @@ export const generateCandidates = async (industry: Industry, turn: number, jobDe
         ];
     }
 };
+
+export const generateInterviewData = async (candidate: Candidate, language: Language): Promise<InterviewData> => {
+    const systemPrompt = getSystemInstruction(language);
+    
+    // Pick an unknown trait to base the question on
+    const unknownTraits = candidate.hiddenTraits.filter(t => !candidate.revealedTraits.includes(t));
+    const targetTrait = unknownTraits.length > 0 ? unknownTraits[Math.floor(Math.random() * unknownTraits.length)] : candidate.hiddenTraits[0];
+
+    const prompt = `
+      Candidate: ${candidate.name} (${candidate.role}, ${candidate.level}).
+      Personality Traits (Hidden): ${candidate.hiddenTraits.join(', ')}.
+      Target Trait to Reveal: "${targetTrait}".
+      
+      TASK:
+      1. Create a "Behavioral Interview Question" that an employer would ask to probe if a person has the "${targetTrait}" trait.
+      2. Create a "Realistic Roleplay Response" from ${candidate.name} that HINTS at the trait "${targetTrait}" without explicitly naming it. 
+         (e.g., if trait is 'Lazy', they might mention "I prefer tasks that don't require too much over-exertion.").
+      3. Create 4 "Interpretations" (Interpretations) for the user to pick from. 
+         - ONE interpretation must correctly identify the trait as "${targetTrait}".
+         - THREE should be plausible but incorrect interpretations (based on other typical traits).
+      
+      OUTPUT FORMAT (JSON):
+      {
+        "question": "The question from employer",
+        "candidateResponse": "The candidate's answer",
+        "options": [
+          { "trait": "Trait Name", "interpretation": "Short explanation of why this trait fits the answer" }
+        ],
+        "correctTrait": "The exact English trait key (camelCase) that is the correct answer"
+      }
+      
+      CRITICAL: All text (question, response, interpretation) must be in ${language === 'vi' ? 'VIETNAMESE' : 'ENGLISH'}.
+      Keep the trait keys (in "trait" and "correctTrait") in English (camelCase).
+    `;
+
+    try {
+        return await callAIWithRetry(() => generateContentJSON<InterviewData>({
+            systemInstruction: systemPrompt,
+            prompt: prompt,
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    question: { type: Type.STRING },
+                    candidateResponse: { type: Type.STRING },
+                    options: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                trait: { type: Type.STRING },
+                                interpretation: { type: Type.STRING }
+                            },
+                            required: ["trait", "interpretation"]
+                        },
+                        minItems: 4,
+                        maxItems: 4
+                    },
+                    correctTrait: { type: Type.STRING }
+                },
+                required: ["question", "candidateResponse", "options", "correctTrait"]
+            },
+            jsonKeys: ["question", "candidateResponse", "options", "correctTrait"]
+        }));
+    } catch (error) {
+        // Fallback
+        return {
+            question: "Tell me about your work ethic.",
+            candidateResponse: "I just do what's expected of me, nothing more, nothing less.",
+            options: [
+                { trait: "quietQuitter", interpretation: "Only does the bare minimum." },
+                { trait: "diligent", interpretation: "Hardworking and dedicated." },
+                { trait: "ambitious", interpretation: "Always seeking growth." },
+                { trait: "loyal", interpretation: "Stays with the company." }
+            ],
+            correctTrait: "quietQuitter"
+        };
+    }
+}
 
 // --- Pitching Logic ---
 

@@ -86,7 +86,8 @@ export const translations = {
         founder: "Founder",
         contracts: "Contracts",
         investment: "Investment",
-        council: "AI Council"
+        council: "AI Council",
+        tutorial: "Tutorial"
       },
       products: {
         title: "Product Portfolio",
@@ -293,7 +294,11 @@ export const translations = {
         },
         hrActions: {
             checkRef: "Check Reference ($50)",
-            trial: "Hire on Trial (50% pay, 2 weeks)"
+            trial: "Hire on Trial (50% pay, 2 weeks)",
+            interview: "Interactive Interview",
+            interviewTitle: "Candidate Interview",
+            interpretLabel: "Choose Interpretation:",
+            done: "Finish Interview"
         },
         interviewNotes: "Interview Notes",
         hireNow: "Hire Now",
@@ -382,7 +387,12 @@ export const translations = {
         errorTurn: "Error processing turn. Please try again.",
         systemError: "System Error. Please check API Key or Network.",
         bankrupt: "Bankrupt (Debt > $10k).",
-        systemFailure: "System Failure"
+        systemFailure: "System Failure",
+        noMoreInterviews: "No more interviews allowed this week!",
+        interviewSuccess: "Success! You correctly decoded the candidate.",
+        interviewFail: "Interview Failed. Your interpretation was incorrect.",
+        traitRevealed: "Hidden Trait Revealed: {trait}",
+        wrongInterpretation: "The candidate was actually showing a different side..."
     },
     history: {
         investmentDeal: "Investment Deal Closed! {name} invested ${amount} for {equity}% equity.",
@@ -412,7 +422,30 @@ export const translations = {
         codeCowboy: "Code Cowboy",
         quietQuitter: "Quiet Quitter",
         dramaKing: "Drama King/Queen",
-        meetingLover: "Meeting Lover"
+        meetingLover: "Meeting Lover",
+        dataDrivenObsession: "Data-driven Obsession"
+    },
+    tutorial: {
+      welcome: {
+        title: "Welcome CEO!",
+        desc: "You are now at the helm of a new startup. Your goal is to grow from a garage operation to a global Unicorn."
+      },
+      loop: {
+        title: "The Gameplay Loop",
+        desc: "Each week, you make decisions in the Command Center. Click 'End Week' to see the impact of your strategy. AI simulates market reactions, employee behavior, and unexpected events."
+      },
+      ops: {
+        title: "Operations",
+        desc: "Build Products to generate revenue. Take on Contracts for quick cash. Pitch to Investors when you need capital to scale."
+      },
+      admin: {
+        title: "Administration",
+        desc: "Manage your Team's roles and morale. Upgrade Infrastructure (Servers, PCs, Coffee!) to boost efficiency. Monitor your Founder profile."
+      },
+      ai: {
+        title: "AI Power",
+        desc: "The AI Council and Secretary provide real-time advice. Use the Intelligence Network to scout markets and competitors."
+      }
     }
   },
   vi: {
@@ -499,7 +532,8 @@ export const translations = {
         founder: "Nhà sáng lập",
         contracts: "Hợp đồng",
         investment: "Đầu tư",
-        council: "Hội đồng AI"
+        council: "Hội đồng AI",
+        tutorial: "Hướng dẫn"
       },
       products: {
         title: "Danh mục sản phẩm",
@@ -699,7 +733,11 @@ export const translations = {
         },
         hrActions: {
             checkRef: "Check Var sếp cũ ($50)",
-            trial: "Thử việc (2 tuần, lương 50%)"
+            trial: "Thử việc (2 tuần, lương 50%)",
+            interview: "Phỏng vấn trực tiếp",
+            interviewTitle: "Phỏng vấn Ứng viên",
+            interpretLabel: "Chọn cách diễn giải:",
+            done: "Kết thúc phỏng vấn"
         },
         interviewNotes: "Ghi chú phỏng vấn",
         hireNow: "Tuyển ngay",
@@ -796,7 +834,12 @@ export const translations = {
         errorTurn: "Có lỗi khi xử lý lượt chơi. Vui lòng thử lại.",
         systemError: "Lỗi hệ thống. Vui lòng kiểm tra API Key hoặc kết nối mạng.",
         bankrupt: "Phá sản (Nợ > $10k).",
-        systemFailure: "Lỗi hệ thống"
+        systemFailure: "Lỗi Hệ thống",
+        noMoreInterviews: "Hết lượt phỏng vấn trong tuần này!",
+        interviewSuccess: "Thành công! Bạn đã đọc vị đúng ứng viên.",
+        interviewFail: "Phỏng vấn thất bại. Diễn giải của bạn không chính xác.",
+        traitRevealed: "Đặc điểm ẩn: {trait}",
+        wrongInterpretation: "Ứng viên thực sự đang thể hiện một khía cạnh khác..."
     },
     history: {
         investmentDeal: "Thương vụ hoàn tất! {name} đã đầu tư ${amount} cho {equity}% cổ phần.",
@@ -825,7 +868,30 @@ export const translations = {
         codeCowboy: "Múa phím rớt não",
         quietQuitter: "Làm đủ ăn rồi cút",
         dramaKing: "Chiến thần hít Drama",
-        meetingLover: "Tôn vương Họp hành"
+        meetingLover: "Tôn vương Họp hành",
+        dataDrivenObsession: "Cuồng số liệu"
+    },
+    tutorial: {
+      welcome: {
+        title: "Chào mừng CEO!",
+        desc: "Bạn đang nắm quyền điều hành một startup mới. Mục tiêu của bạn là phát triển từ một văn phòng tại gia thành một Kỳ lân (Unicorn) toàn cầu."
+      },
+      loop: {
+        title: "Vòng lặp Gameplay",
+        desc: "Mỗi tuần, bạn đưa ra các quyết định trong Bàn làm việc (Command Center). Nhấn 'Kết thúc tuần' để thấy tác động chiến lược. AI sẽ mô phỏng phản ứng thị trường và nhân viên."
+      },
+      ops: {
+        title: "Vận hành",
+        desc: "Xây dựng Sản phẩm để tạo doanh thu. Nhận Hợp đồng để có tiền mặt nhanh. Gọi vốn từ Nhà đầu tư khi bạn cần vốn để mở rộng quy mô."
+      },
+      admin: {
+        title: "Quản trị",
+        desc: "Quản lý vai trò và tinh thần của Nhân sự. Nâng cấp Hạ tầng (Máy chủ, PC, Máy pha cà phê!) để tăng hiệu suất."
+      },
+      ai: {
+        title: "Sức mạnh AI",
+        desc: "Hội đồng AI và Thư ký cung cấp lời khuyên thời gian thực. Sử dụng Mạng lưới thông tin để do thám thị trường và đối thủ."
+      }
     }
   }
 };
